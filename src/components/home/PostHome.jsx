@@ -1,95 +1,71 @@
-import React, { useState } from 'react';
-import { View, TextInput, Button, Image, StyleSheet, Alert } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
+import React, { useState, useRef } from 'react';
+import {
+  View,
+  FlatList,
+  Animated,
+  StyleSheet,
+  StatusBar,
+} from 'react-native';
+import PostHome from './PostHome';
+import PostItem from '../PostItem';
 import { colors } from '../global/colors';
-const PostHome = ({ onPost }) => {
-  const [text, setText] = useState('');
-  const [image, setImage] = useState(null);
 
-  const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permiso denegado', 'Necesitamos acceso a tu galería.');
-      return;
-    }
+const Home = () => {
+  const [posts, setPosts] = useState([]);
+  const scrollY = useRef(new Animated.Value(0)).current;
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.7,
-    });
-
-    if (!result.canceled && result.assets?.length > 0) {
-      setImage(result.assets[0].uri);
-    }
-  };
-
-  const handleSubmit = () => {
-    if (!text && !image) {
-      Alert.alert('Campos vacíos', 'Escribe algo o selecciona una imagen.');
-      return;
-    }
-
-    // Enviar el post al padre
-    if (onPost) {
-      onPost({ text, image });
-    }
-
-    // Limpiar campos después de publicar
-    setText('');
-    setImage(null);
+  const handleNewPost = (newPost) => {
+    setPosts((prevPosts) => [newPost, ...prevPosts]);
   };
 
   return (
     <View style={styles.container}>
-      <TextInput
-        placeholder="¿Qué estás pensando?"
-        value={text}
-        onChangeText={setText}
-        style={styles.input}
-        placeholderTextColor={colors.TEXTO_SECUNDARIO}
-        multiline
+      <Animated.View
+        style={[
+          styles.postHomeContainer,
+          {
+            height: scrollY.interpolate({
+              inputRange: [0, 50],
+              outputRange: [undefined, 0],
+              extrapolate: 'clamp',
+            }),
+            opacity: scrollY.interpolate({
+              inputRange: [0, 50],
+              outputRange: [1, 0],
+              extrapolate: 'clamp',
+            }),
+            overflow: 'hidden',
+          },
+        ]}
+      >
+        <PostHome onPost={handleNewPost} />
+      </Animated.View>
+
+      <Animated.FlatList
+        data={posts}
+        keyExtractor={(_, index) => index.toString()}
+        renderItem={({ item }) => (
+          <PostItem text={item.text} image={item.image} />
+        )}
+        contentContainerStyle={{ paddingBottom: 100 }}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
       />
-      {image && <Image source={{ uri: image }} style={styles.image} />}
-      <View style={styles.buttons}>
-        <Button title="Seleccionar Imagen" onPress={pickImage} color={colors.PRIMARIO} />
-        <Button title="Publicar" onPress={handleSubmit} color={colors.SECUNDARIO} />
-      </View>
     </View>
   );
 };
 
-export default PostHome;
-
 const styles = StyleSheet.create({
   container: {
-    padding: 12,
-    backgroundColor: colors.FONDO_CARDS,
-    marginBottom: 10,
-    borderRadius: 8,
-    shadowColor: colors.SOMBRA,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    flex: 1,
+    backgroundColor: colors.FONDO,
+    paddingTop: StatusBar.currentHeight || 0,
   },
-  input: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.GRIS_INTERMEDIO,
-    color: colors.TEXTO_PRINCIPAL,
-    paddingVertical: 8,
-    marginBottom: 8,
-    minHeight: 60,
-  },
-  image: {
+  postHomeContainer: {
     width: '100%',
-    height: 200,
-    marginVertical: 8,
-    borderRadius: 8,
-  },
-  buttons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 10,
   },
 });
+
+export default Home;
