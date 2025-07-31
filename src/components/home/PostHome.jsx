@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, TextInput, Button, Image, StyleSheet, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../global/colors';
-const PostForm = () => {
+const PostHome = ({ onPost }) => {
   const [text, setText] = useState('');
   const [image, setImage] = useState(null);
 
@@ -30,7 +30,12 @@ const PostForm = () => {
       return;
     }
 
-    console.log('Publicación:', { text, image });
+    // Enviar el post al padre
+    if (onPost) {
+      onPost({ text, image });
+    }
+
+    // Limpiar campos después de publicar
     setText('');
     setImage(null);
   };
@@ -54,7 +59,7 @@ const PostForm = () => {
   );
 };
 
-export default PostForm;
+export default PostHome;
 
 const styles = StyleSheet.create({
   container: {
@@ -70,7 +75,7 @@ const styles = StyleSheet.create({
   },
   input: {
     borderBottomWidth: 1,
-    borderBottomColor: colors.SOMBRA,
+    borderBottomColor: colors.GRIS_INTERMEDIO,
     color: colors.TEXTO_PRINCIPAL,
     paddingVertical: 8,
     marginBottom: 8,

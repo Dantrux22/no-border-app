@@ -1,12 +1,11 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, SafeAreaView } from 'react-native';
+import { SafeAreaView, StyleSheet } from 'react-native';
 import Header from './src/components/Header';
 import Home from './src/components/home/Home';
+import { colors } from './src/components/global/colors';
 
 export default function App() {
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar style="light" />
       <Header title="No Border" />
       <Home />
     </SafeAreaView>
@@ -16,6 +15,7 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.FONDO,
   },
 });
+
