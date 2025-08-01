@@ -11,7 +11,7 @@ import PostHome from './PostHome';
 import PostItem from '../PostItem';
 import { colors } from '../global/colors';
 
-const screenHeight = Dimensions.get('window').height;
+const POST_HOME_HEIGHT = 160;
 
 const Home = () => {
   const [posts, setPosts] = useState([]);
@@ -19,7 +19,7 @@ const Home = () => {
 
   const translateY = scrollY.interpolate({
     inputRange: [0, 50],
-    outputRange: [0, -200],
+    outputRange: [0, -POST_HOME_HEIGHT],
     extrapolate: 'clamp',
   });
 
@@ -35,7 +35,16 @@ const Home = () => {
 
   return (
     <View style={styles.container}>
-      <Animated.View style={[styles.postHomeContainer, { transform: [{ translateY }], opacity }]}>
+      <Animated.View
+        style={[
+          styles.postHomeContainer,
+          {
+            transform: [{ translateY }],
+            opacity,
+            height: POST_HOME_HEIGHT,
+          },
+        ]}
+      >
         <PostHome onPost={handleNewPost} />
       </Animated.View>
 
@@ -60,18 +69,20 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.FONDO,
-    paddingTop: StatusBar.currentHeight,
+    paddingTop: StatusBar.currentHeight || 0,
   },
   postHomeContainer: {
     position: 'absolute',
-    top: StatusBar.currentHeight,
+    top: StatusBar.currentHeight || 0,
     left: 0,
     right: 0,
     zIndex: 10,
+    paddingHorizontal: 16,
   },
   flatListContent: {
-    paddingTop: 0, // ⛔ No más espacio arriba
+    paddingTop: POST_HOME_HEIGHT + 10, // 🔥 Esto es lo que soluciona el espacio negro
     paddingBottom: 30,
+    paddingHorizontal: 16,
   },
 });
 
