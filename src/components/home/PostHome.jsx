@@ -2,10 +2,14 @@ import React, { useState } from 'react';
 import {
   View,
   TextInput,
+  StyleSheet,
   Button,
   Image,
-  StyleSheet,
+  TouchableOpacity,
   Alert,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../global/colors';
@@ -14,7 +18,7 @@ const PostHome = ({ onPost }) => {
   const [text, setText] = useState('');
   const [image, setImage] = useState(null);
 
-  const handleImagePick = async () => {
+  const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
@@ -27,8 +31,8 @@ const PostHome = ({ onPost }) => {
   };
 
   const handleSubmit = () => {
-    if (!text && !image) {
-      Alert.alert('Campos vacíos', 'Escribe algo o selecciona una imagen.');
+    if (!text.trim() && !image) {
+      Alert.alert('Publicación vacía', 'Escribí algo o subí una imagen.');
       return;
     }
 
@@ -38,49 +42,81 @@ const PostHome = ({ onPost }) => {
   };
 
   return (
-    <View style={styles.container}>
-      <TextInput
-        placeholder="¿Qué estás pensando?"
-        placeholderTextColor={colors.TEXTO_SECUNDARIO}
-        value={text}
-        onChangeText={setText}
-        style={styles.input}
-        multiline
-      />
-      {image && <Image source={{ uri: image }} style={styles.image} />}
-      <View style={styles.buttons}>
-        <Button title="Imagen" onPress={handleImagePick} color={colors.PRIMARIO} />
-        <Button title="Publicar" onPress={handleSubmit} color={colors.PRIMARIO} />
-      </View>
-    </View>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={styles.container}
+    >
+      <ScrollView
+        style={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+      >
+        <TextInput
+          style={styles.input}
+          placeholder="¿En qué estás pensando?"
+          placeholderTextColor={colors.TEXTO_SECUNDARIO}
+          multiline
+          scrollEnabled
+          value={text}
+          onChangeText={setText}
+        />
+
+        {image && (
+          <Image source={{ uri: image }} style={styles.previewImage} />
+        )}
+
+        <View style={styles.buttonsContainer}>
+          <TouchableOpacity style={styles.button} onPress={pickImage}>
+            <Button title="Subir imagen" color={colors.PRIMARIO} onPress={pickImage} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.button} onPress={handleSubmit}>
+            <Button title="Publicar" color={colors.PRIMARIO} onPress={handleSubmit} />
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
+
+export default PostHome;
 
 const styles = StyleSheet.create({
   container: {
     backgroundColor: colors.FONDO_CARDS,
-    padding: 10,
-    borderRadius: 10,
+    padding: 12,
+    borderRadius: 12,
     margin: 16,
+    shadowColor: colors.SOMBRA,
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  scroll: {
+    maxHeight: 250,
   },
   input: {
     color: colors.TEXTO_PRINCIPAL,
     borderBottomWidth: 1,
-    borderBottomColor: colors.GRIS_INTERMEDIO,
-    paddingVertical: 8,
-    marginBottom: 8,
-    minHeight: 60,
+    borderColor: colors.GRIS_INTERMEDIO,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    minHeight: 80,
+    maxHeight: 200,
+    textAlignVertical: 'top',
+    marginBottom: 12,
   },
-  image: {
+  previewImage: {
     width: '100%',
-    height: 200,
-    borderRadius: 8,
+    height: 180,
+    borderRadius: 10,
     marginBottom: 10,
   },
-  buttons: {
+  buttonsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
+  button: {
+    flex: 1,
+    marginHorizontal: 5,
+  },
 });
-
-export default PostHome;
