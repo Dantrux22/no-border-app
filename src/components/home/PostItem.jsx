@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
 import { colors } from '../global/colors';
-import { FontAwesome, Feather, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+
 
 const PostItem = ({ text, image }) => {
   const [isLiked, setIsLiked] = useState(false);
@@ -11,44 +12,46 @@ const PostItem = ({ text, image }) => {
   const handleSave = () => setIsSaved(!isSaved);
 
   return (
-    <View style={styles.container}>
-      {/* Header con foto y nombre de usuario */}
-      <View style={styles.userInfo}>
-        <Image
-source={{ uri: 'https://amhigo.com/images/amhiblog/expertos/Luis_Flores_/Foto_portada.jpg' }}          style={styles.avatar}
-        />
-        <Text style={styles.username}>NombreUsuario</Text>
-      </View>
+<View style={styles.container}>
+  {/* Header con foto y nombre de usuario */}
+  <View style={styles.userInfo}>
+    <Image
+      source={{ uri: 'https://amhigo.com/images/amhiblog/expertos/Luis_Flores_/Foto_portada.jpg' }}
+      style={styles.avatar}
+    />
+    <Text style={styles.username}>NombreUsuario</Text>
+  </View>
 
-      {/* Texto del post */}
-      {text ? <Text style={styles.text}>{text}</Text> : null}
+  {/* Texto del post */}
+  {text ? <Text style={styles.text}>{text}</Text> : null}
 
-      {/* Imagen del post */}
-      {image ? <Image source={{ uri: image }} style={styles.image} /> : null}
+  {/* Imagen del post */}
+  {image ? <Image source={{ uri: image }} style={styles.image} /> : null}
 
-      {/* Iconos de interacción */}
-      <View style={styles.iconsContainer}>
-        <TouchableOpacity style={styles.iconButton} onPress={handleLike}>
-          <FontAwesome
-            name={isLiked ? 'heart' : 'heart-o'}
-            size={22}
-            color={isLiked ? 'red' : colors.TEXTO_SECUNDARIO}
-          />
-        </TouchableOpacity>
+  {/* Iconos en una fila */}
+  <View style={styles.iconsContainer}>
+    <TouchableOpacity style={styles.iconButton} onPress={handleLike}>
+      <Ionicons
+        name={isLiked ? 'heart' : 'heart-outline'}
+        size={24}
+        color={isLiked ? 'red' : colors.TEXTO_SECUNDARIO}
+      />
+    </TouchableOpacity>
 
-        <TouchableOpacity style={styles.iconButton}>
-          <Feather name="message-circle" size={22} color={colors.TEXTO_SECUNDARIO} />
-        </TouchableOpacity>
+    <TouchableOpacity style={styles.iconButton}>
+      <Ionicons name="chatbubble-outline" size={24} color={colors.TEXTO_SECUNDARIO} />
+    </TouchableOpacity>
 
-        <TouchableOpacity style={styles.iconButton} onPress={handleSave}>
-          <MaterialIcons
-            name={isSaved ? 'bookmark' : 'bookmark-border'}
-            size={22}
-            color={isSaved ? colors.PRIMARIO : colors.TEXTO_SECUNDARIO}
-          />
-        </TouchableOpacity>
-      </View>
-    </View>
+    <TouchableOpacity style={styles.iconButton} onPress={handleSave}>
+      <Ionicons
+        name={isSaved ? 'bookmark' : 'bookmark-outline'}
+        size={24}
+        color={isSaved ? colors.PRIMARIO : colors.TEXTO_SECUNDARIO}
+      />
+    </TouchableOpacity>
+  </View>
+</View>
+
   );
 };
 
