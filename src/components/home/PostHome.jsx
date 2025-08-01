@@ -1,29 +1,20 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View,
-  FlatList,
-  Animated,
+  TextInput,
+  Button,
+  Image,
   StyleSheet,
-  StatusBar,
+  Alert,
 } from 'react-native';
-import PostHome from './PostHome';
-import PostItem from '../PostItem';
+import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../global/colors';
-<<<<<<< HEAD
-=======
-const PostForm = () => {
+
+const PostHome = ({ onPost }) => {
   const [text, setText] = useState('');
   const [image, setImage] = useState(null);
->>>>>>> parent of 61e635a (.)
 
-const Home = () => {
-  const [posts, setPosts] = useState([]);
-  const scrollY = useRef(new Animated.Value(0)).current;
-
-<<<<<<< HEAD
-  const handleNewPost = (newPost) => {
-    setPosts((prevPosts) => [newPost, ...prevPosts]);
-=======
+  const handleImagePick = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
@@ -41,77 +32,55 @@ const Home = () => {
       return;
     }
 
-    console.log('Publicación:', { text, image });
+    onPost({ text, image });
     setText('');
     setImage(null);
->>>>>>> parent of 61e635a (.)
   };
 
   return (
     <View style={styles.container}>
-      <Animated.View
-        style={[
-          styles.postHomeContainer,
-          {
-            height: scrollY.interpolate({
-              inputRange: [0, 50],
-              outputRange: [undefined, 0],
-              extrapolate: 'clamp',
-            }),
-            opacity: scrollY.interpolate({
-              inputRange: [0, 50],
-              outputRange: [1, 0],
-              extrapolate: 'clamp',
-            }),
-            overflow: 'hidden',
-          },
-        ]}
-      >
-        <PostHome onPost={handleNewPost} />
-      </Animated.View>
-
-      <Animated.FlatList
-        data={posts}
-        keyExtractor={(_, index) => index.toString()}
-        renderItem={({ item }) => (
-          <PostItem text={item.text} image={item.image} />
-        )}
-        contentContainerStyle={{ paddingBottom: 100 }}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: false }
-        )}
+      <TextInput
+        placeholder="¿Qué estás pensando?"
+        placeholderTextColor={colors.TEXTO_SECUNDARIO}
+        value={text}
+        onChangeText={setText}
+        style={styles.input}
+        multiline
       />
+      {image && <Image source={{ uri: image }} style={styles.image} />}
+      <View style={styles.buttons}>
+        <Button title="Imagen" onPress={handleImagePick} color={colors.PRIMARIO} />
+        <Button title="Publicar" onPress={handleSubmit} color={colors.PRIMARIO} />
+      </View>
     </View>
   );
 };
 
-<<<<<<< HEAD
-=======
-export default PostForm;
-
->>>>>>> parent of 61e635a (.)
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: colors.FONDO,
-    paddingTop: StatusBar.currentHeight || 0,
+    backgroundColor: colors.FONDO_CARDS,
+    padding: 10,
+    borderRadius: 10,
+    margin: 16,
   },
-<<<<<<< HEAD
-  postHomeContainer: {
-=======
   input: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.SOMBRA,
     color: colors.TEXTO_PRINCIPAL,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.GRIS_INTERMEDIO,
     paddingVertical: 8,
     marginBottom: 8,
     minHeight: 60,
   },
   image: {
->>>>>>> parent of 61e635a (.)
     width: '100%',
+    height: 200,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  buttons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
 });
 
-export default Home;
+export default PostHome;
