@@ -88,15 +88,18 @@ export default PostItem;
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.FONDO_CARDS,
+    backgroundColor: colors.NEGRO,
+    paddingTop: 15,
     padding: 12,
-    borderRadius: 12,
-    marginBottom: 12,
-    marginHorizontal: 16,
-    shadowColor: colors.SOMBRA,
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 2,
+   // borderRadius: 0,
+    marginBottom: 2,
+    marginLeft: -20,
+    marginRight: -20,
+   // marginHorizontal: 0,
+    // shadowColor: colors.BLANCO,
+    // shadowOpacity: .2,
+    // shadowRadius: 1,
+    // elevation: 2,
   },
   userInfo: {
     flexDirection: 'row',

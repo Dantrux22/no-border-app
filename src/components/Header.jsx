@@ -13,11 +13,11 @@ export default Header;
 
 const styles = StyleSheet.create({
   container: {
-    height: 100,
+    height: 80,
     backgroundColor: colors.PRIMARIO,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 40, // para evitar que se superponga con la barra de estado
+    paddingTop: 30,
     elevation: 4,
     shadowColor: colors.NEGRO,
     shadowOffset: { width: 0, height: 2 },

@@ -90,7 +90,7 @@ const Home = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.FONDO,
+    backgroundColor: colors.FONDO_CARDS,
     paddingTop: StatusBar.currentHeight || 0,
   },
   postHomeContainer: {
