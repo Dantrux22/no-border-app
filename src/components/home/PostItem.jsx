@@ -13,6 +13,12 @@ const PostItem = ({ text, image }) => {
   const handleLike = () => setIsLiked(!isLiked);
   const handleSave = () => setIsSaved(!isSaved);
 
+  // obtiene la hora actual en HH:MM
+  const timeString = new Date().toLocaleTimeString([], {
+    hour:   '2-digit',
+    minute: '2-digit',
+  });
+
   const renderText = () => {
     if (!text) return null;
 
@@ -43,20 +49,30 @@ const PostItem = ({ text, image }) => {
 
   return (
     <View style={styles.container}>
-      {/* Header con foto y nombre de usuario */}
+      {/* Header con foto, nombre de usuario y hora */}
       <View style={styles.userInfo}>
         <Image
           source={{ uri: 'https://amhigo.com/images/amhiblog/expertos/Luis_Flores_/Foto_portada.jpg' }}
           style={styles.avatar}
         />
         <Text style={styles.username}>NombreUsuario</Text>
+        <Text
+          style={{
+            color: colors.TEXTO_SECUNDARIO,
+            marginLeft: 'auto',   // empuja hacia la derecha
+            fontSize: 14,
+            marginRight: 20,
+          }}
+        >
+          {timeString}
+        </Text>
       </View>
 
       {/* Texto con botón de Leer más / Leer menos */}
       {renderText()}
 
       {/* Imagen del post */}
-      {image ? <Image source={{ uri: image }} style={styles.image} /> : null}
+      {image && <Image source={{ uri: image }} style={styles.image} />}
 
       {/* Iconos en una fila */}
       <View style={styles.iconsContainer}>
@@ -91,15 +107,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.NEGRO,
     paddingTop: 15,
     padding: 12,
-   // borderRadius: 0,
     marginBottom: 2,
     marginLeft: -20,
     marginRight: -20,
-   // marginHorizontal: 0,
-    // shadowColor: colors.BLANCO,
-    // shadowOpacity: .2,
-    // shadowRadius: 1,
-    // elevation: 2,
   },
   userInfo: {
     flexDirection: 'row',
