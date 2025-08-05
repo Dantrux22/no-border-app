@@ -8,29 +8,39 @@ import {
   Button,
   Text,
   StyleSheet,
+  Image,
+  View,
 } from 'react-native';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, db, storage } from '../firebaseConfig';
 import { colors } from '../global/colors';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { doc, setDoc } from 'firebase/firestore';
-import * as ImagePicker from 'react-native-image-picker';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 
 export default function RegisterScreen({ navigation }) {
-  const [email, setEmail] = useState('');
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
-  const [avatar, setAvatar] = useState(null);
-  const [error, setError] = useState('');
+  const [avatar, setAvatar]     = useState(null);
+  const [error, setError]       = useState('');
 
-  const pickImage = () => {
-    ImagePicker.launchImageLibrary(
-      { mediaType: 'photo', quality: 0.7 },
-      (response) => {
-        if (response.didCancel || response.errorCode) return;
-        setAvatar(response.assets[0]);
-      }
-    );
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      setError('Permiso denegado para acceder a la galería');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaType.Images,
+      quality: 0.7,
+      aspect: [1, 1],
+    });
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    setAvatar({ uri: asset.uri });
+    setError('');
   };
 
   const handleRegister = async () => {
@@ -39,21 +49,25 @@ export default function RegisterScreen({ navigation }) {
       return;
     }
     try {
+      // 1) Crear cuenta
       const userCred = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password
+        auth, email, password
       );
       const uid = userCred.user.uid;
 
-      // Subir avatar
-      const imgRef = ref(storage, `avatars/${uid}`);
-      const resp = await fetch(avatar.uri);
-      const blob = await resp.blob();
-      await uploadBytes(imgRef, blob);
+      // 2) Leer archivo como base64
+      const base64 = await FileSystem.readAsStringAsync(avatar.uri, {
+        encoding: FileSystem.EncodingType.Base64
+      });
+
+      // 3) Subir base64 a Firebase Storage
+      const imgRef = ref(storage, `avatars/${uid}.jpg`);
+      await uploadString(imgRef, base64, 'base64', {
+        contentType: 'image/jpeg'
+      });
       const avatarURL = await getDownloadURL(imgRef);
 
-      // Guardar perfil
+      // 4) Guardar perfil en Firestore
       await setDoc(doc(db, 'users', uid), {
         username,
         avatar: avatarURL,
@@ -61,7 +75,7 @@ export default function RegisterScreen({ navigation }) {
         createdAt: new Date(),
       });
 
-      // Navegar
+      // 5) Navegar
       navigation.replace('ProfileSetupScreen');
     } catch (err) {
       setError(err.message);
@@ -97,9 +111,19 @@ export default function RegisterScreen({ navigation }) {
         value={username}
         onChangeText={setUsername}
       />
-      <Button title="Seleccionar foto de perfil" onPress={pickImage} />
-      {avatar && <Text style={styles.selected}>✔️ Foto seleccionada</Text>}
+
+      <View style={styles.imageContainer}>
+        <Button title="Seleccionar foto de perfil" onPress={pickImage} />
+        {avatar && (
+          <Image
+            source={{ uri: avatar.uri }}
+            style={styles.avatarPreview}
+          />
+        )}
+      </View>
+
       {!!error && <Text style={styles.error}>{error}</Text>}
+
       <Button title="Registrarme" onPress={handleRegister} />
     </KeyboardAvoidingView>
   );
@@ -121,13 +145,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 8,
   },
+  imageContainer: {
+    alignItems: 'center',
+    marginVertical: 12,
+  },
+  avatarPreview: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginTop: 8,
+  },
   error: {
     color: 'red',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  selected: {
-    color: colors.PRIMARIO,
     marginBottom: 12,
     textAlign: 'center',
   },

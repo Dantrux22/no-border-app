@@ -1,69 +1,29 @@
-import React, { useEffect, useState } from 'react';
-import { StatusBar, StyleSheet, View, ActivityIndicator } from 'react-native';
+// App.js
+import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import { colors } from './src/components/global/colors';
-
+import AuthProvider from './src/components/auth/AuthProvider';
 import AuthScreen from './src/components/auth/AuthScreen';
 import RegisterScreen from './src/components/auth/RegisterScreen';
 import LoginScreen from './src/components/auth/LoginScreen';
+import ProfileSetupScreen from './src/components/ProfileSetupScreen';
 import Home from './src/components/home/Home';
-
-import { auth } from './src/components/firebaseConfig';
-import { onAuthStateChanged } from 'firebase/auth';
 
 const Stack = createNativeStackNavigator();
 
 export default function App() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setLoading(false);
-    });
-
-    return unsubscribe;
-  }, []);
-
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.PRIMARIO} />
-      </View>
-    );
-  }
-
   return (
-    <NavigationContainer>
-      <StatusBar barStyle="light-content" backgroundColor={colors.FONDO} />
-      <Stack.Navigator
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: colors.FONDO },
-        }}
-      >
-        {user ? (
+    <AuthProvider>
+      <NavigationContainer>
+        <Stack.Navigator initialRouteName="Auth" screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Auth" component={AuthScreen} />
+          <Stack.Screen name="Register" component={RegisterScreen} />
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="ProfileSetupScreen" component={ProfileSetupScreen} />
           <Stack.Screen name="Home" component={Home} />
-        ) : (
-          <>
-            <Stack.Screen name="Auth" component={AuthScreen} />
-            <Stack.Screen name="Register" component={RegisterScreen} />
-            <Stack.Screen name="Login" component={LoginScreen} />
-          </>
-        )}
-      </Stack.Navigator>
-    </NavigationContainer>
+        </Stack.Navigator>
+      </NavigationContainer>
+    </AuthProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: colors.FONDO,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});
