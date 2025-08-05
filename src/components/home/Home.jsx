@@ -1,3 +1,5 @@
+// src/components/home/Home.jsx
+
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -10,8 +12,8 @@ import {
   Text,
   FlatList,
 } from 'react-native';
-import PostHome from './PostHome';      // ← Ruta corregida
-import PostItem from './PostItem';      // ← Ruta corregida
+import PostHome from './PostHome';
+import PostItem from './PostItem';
 import { colors } from '../global/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { signOut } from 'firebase/auth';
@@ -21,43 +23,54 @@ import { doc, getDoc } from 'firebase/firestore';
 const POST_HOME_HEIGHT = 160;
 const SCROLL_TOP_THRESHOLD = 300;
 
-export default function Home() {
-  const [posts, setPosts]       = useState([]);
-  const [profile, setProfile]   = useState(null);
-  const scrollY                = useRef(new Animated.Value(0)).current;
-  const flatListRef            = useRef(null);
+export default function Home({ navigation }) {
+  const [posts, setPosts] = useState([]);
+  const [profile, setProfile] = useState(null);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const flatListRef = useRef(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
 
   useEffect(() => {
-    const loadProfile = async () => {
+    async function loadProfile() {
       const uid = auth.currentUser?.uid;
       if (!uid) return;
-      const snap = await getDoc(doc(db, 'users', uid));
-      if (snap.exists()) setProfile(snap.data());
-    };
+      try {
+        const snapshot = await getDoc(doc(db, 'users', uid));
+        if (snapshot.exists()) {
+          setProfile(snapshot.data());
+        }
+      } catch (e) {
+        console.warn('Error cargando perfil:', e);
+      }
+    }
     loadProfile();
   }, []);
 
   const translateY = scrollY.interpolate({
-    inputRange:  [0, 50],
+    inputRange: [0, 50],
     outputRange: [0, -POST_HOME_HEIGHT],
     extrapolate: 'clamp',
   });
+
   const opacity = scrollY.interpolate({
-    inputRange:  [0, 50],
+    inputRange: [0, 50],
     outputRange: [1, 0],
     extrapolate: 'clamp',
   });
 
-  const handleNewPost = newPost => setPosts(prev => [newPost, ...prev]);
+  const handleNewPost = (newPost) => {
+    setPosts((prev) => [newPost, ...prev]);
+  };
+
   const handleScroll = Animated.event(
     [{ nativeEvent: { contentOffset: { y: scrollY } } }],
     {
       useNativeDriver: false,
-      listener: e =>
+      listener: (e) =>
         setShowScrollTop(e.nativeEvent.contentOffset.y > SCROLL_TOP_THRESHOLD),
     }
   );
+
   const scrollToTop = () =>
     flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
 
@@ -66,7 +79,10 @@ export default function Home() {
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Sí',
-        onPress: () => signOut(auth),
+        onPress: async () => {
+          await signOut(auth);
+          navigation.replace('Auth');
+        },
       },
     ]);
   };
@@ -78,9 +94,7 @@ export default function Home() {
           {profile.avatar && (
             <Image source={{ uri: profile.avatar }} style={styles.avatar} />
           )}
-          <Text style={styles.welcome}>
-            ¡Bienvenido, {profile.username}!
-          </Text>
+          <Text style={styles.welcome}>¡Bienvenido, {profile.username}!</Text>
         </View>
       )}
 
@@ -135,9 +149,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.FONDO_CARDS,
     paddingTop: StatusBar.currentHeight || 0,
   },
-  profileHeader: { alignItems: 'center', marginBottom: 12 },
-  avatar: { width: 80, height: 80, borderRadius: 40, marginBottom: 8 },
-  welcome: { color: colors.TEXTO_PRINCIPAL, fontSize: 18 },
+  profileHeader: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  avatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginBottom: 8,
+  },
+  welcome: {
+    color: colors.TEXTO_PRINCIPAL,
+    fontSize: 18,
+  },
   logoutIcon: {
     position: 'absolute',
     top: StatusBar.currentHeight || 10,

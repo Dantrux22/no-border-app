@@ -4,7 +4,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   TextInput,
-  Button,
   Text,
   StyleSheet,
   Image,
@@ -49,7 +48,6 @@ export default function RegisterScreen({ navigation }) {
       return;
     }
     try {
-      // 1) Crear usuario en Auth
       const { user } = await createUserWithEmailAndPassword(
         auth,
         email.trim(),
@@ -57,23 +55,24 @@ export default function RegisterScreen({ navigation }) {
       );
       const uid = user.uid;
 
-      // 2) Subir foto y obtener URL
       const base64 = await FileSystem.readAsStringAsync(avatar.uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
       const storageRef = ref(storage, `avatars/${uid}.jpg`);
-      await uploadString(storageRef, `data:image/jpeg;base64,${base64}`, 'data_url');
+      await uploadString(
+        storageRef,
+        `data:image/jpeg;base64,${base64}`,
+        'data_url'
+      );
       const photoURL = await getDownloadURL(storageRef);
 
-      // 3) Guardar perfil completo en Firestore
       await setDoc(doc(db, 'users', uid), {
         username:  username.trim(),
         email:     email.trim(),
         avatar:    photoURL,
         createdAt: new Date(),
       });
-
-      // No llamamos a navigation.replace: el listener global sube a Home
+      navigation.replace('Home');
     } catch (err) {
       if (err.code === 'auth/email-already-in-use') {
         setError('Este correo ya está registrado.');
@@ -92,6 +91,8 @@ export default function RegisterScreen({ navigation }) {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      <Text style={styles.header}>Registrarse a No Border</Text>
+
       <TextInput
         placeholder="Email"
         placeholderTextColor={colors.TEXTO_SECUNDARIO}
@@ -117,23 +118,21 @@ export default function RegisterScreen({ navigation }) {
         onChangeText={setUsername}
       />
 
-      <View style={styles.imageContainer}>
-        <Button title="Seleccionar foto de perfil" onPress={pickImage} />
-        {avatar && (
-          <Image source={{ uri: avatar.uri }} style={styles.avatarPreview} />
-        )}
-      </View>
+      <TouchableOpacity style={styles.actionButton} onPress={pickImage}>
+        <Text style={styles.buttonText}>
+          {avatar ? 'Cambiar foto de perfil' : 'Seleccionar foto de perfil'}
+        </Text>
+      </TouchableOpacity>
 
-      {!!error && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.error}>{error}</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-            <Text style={styles.link}>¿Ya tienes cuenta? Inicia sesión</Text>
-          </TouchableOpacity>
-        </View>
+      {avatar && (
+        <Image source={{ uri: avatar.uri }} style={styles.avatarPreview} />
       )}
 
-      <Button title="Registrarme" onPress={handleRegister} />
+      {!!error && <Text style={styles.error}>{error}</Text>}
+
+      <TouchableOpacity style={styles.actionButton} onPress={handleRegister}>
+        <Text style={styles.buttonText}>Registrarse a No Border</Text>
+      </TouchableOpacity>
     </KeyboardAvoidingView>
   );
 }
@@ -143,9 +142,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.FONDO,
     justifyContent: 'center',
+    alignItems: 'center',
     padding: 20,
   },
+  header: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.TEXTO_PRINCIPAL,
+    marginBottom: 20,
+  },
   input: {
+    width: '100%',
     height: 50,
     borderColor: colors.TEXTO_SECUNDARIO,
     borderWidth: 1,
@@ -154,26 +161,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 8,
   },
-  imageContainer: {
+  actionButton: {
+    width: '80%',
+    height: 50,
+    backgroundColor: colors.PRIMARIO,
+    borderRadius: 25,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginVertical: 12,
+    marginVertical: 10,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   avatarPreview: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    marginTop: 8,
-  },
-  errorContainer: {
-    marginBottom: 12,
-    alignItems: 'center',
+    marginVertical: 16,
+    borderWidth: 2,
+    borderColor: colors.PRIMARIO,
   },
   error: {
     color: 'red',
+    marginTop: 8,
     textAlign: 'center',
-  },
-  link: {
-    color: colors.PRIMARIO,
-    marginTop: 4,
   },
 });

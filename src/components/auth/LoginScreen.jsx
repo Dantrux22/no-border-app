@@ -1,6 +1,15 @@
 // src/components/auth/LoginScreen.jsx
+
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Button,
+  StyleSheet,
+  Alert,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebaseConfig';
@@ -12,34 +21,85 @@ export default function LoginScreen() {
   const navigation = useNavigation();
 
   const handleLogin = async () => {
+    if (!email.trim() || !password) {
+      Alert.alert('Error', 'Email y contraseña son obligatorios.');
+      return;
+    }
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await signInWithEmailAndPassword(auth, email.trim(), password);
       navigation.replace('Home');
-    } catch (err) {
-      Alert.alert('Error', err.message);
+    } catch (error) {
+      Alert.alert('Error', error.message);
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Iniciá sesión</Text>
-      <TextInput style={styles.input} placeholder="Email"            placeholderTextColor={colors.TEXTO_SECUNDARIO} onChangeText={setEmail}    value={email}     autoCapitalize="none" />
-      <TextInput style={styles.input} placeholder="Contraseña"       placeholderTextColor={colors.TEXTO_SECUNDARIO} secureTextEntry            onChangeText={setPassword} value={password} />
-      <TouchableOpacity style={styles.button} onPress={handleLogin}>
-        <Text style={styles.buttonText}>Ingresar</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-        <Text style={styles.linkText}>¿No tenés cuenta? Registrate</Text>
-      </TouchableOpacity>
+      <Text style={styles.title}>Bienvenido a No Border</Text>
+
+      <TextInput
+        style={styles.input}
+        placeholder="Email"
+        placeholderTextColor={colors.TEXTO_SECUNDARIO}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        value={email}
+        onChangeText={setEmail}
+      />
+
+      <TextInput
+        style={styles.input}
+        placeholder="Contraseña"
+        placeholderTextColor={colors.TEXTO_SECUNDARIO}
+        secureTextEntry
+        value={password}
+        onChangeText={setPassword}
+      />
+
+      <Button title="Iniciar sesión" onPress={handleLogin} />
+
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>¿No estás registrado?</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+          <Text style={styles.link}>Registrate aquí</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.FONDO, justifyContent: 'center', padding: 20 },
-  title:     { color: colors.TEXTO_PRINCIPAL, fontSize: 24, fontWeight: 'bold', marginBottom: 24, textAlign: 'center' },
-  input:     { backgroundColor: colors.FONDO_CARDS, color: colors.TEXTO_PRINCIPAL, padding: 12, borderRadius: 10, marginBottom: 16 },
-  button:    { backgroundColor: colors.PRIMARIO, padding: 14, borderRadius: 10, alignItems: 'center' },
-  buttonText:{ color: colors.BLANCO, fontWeight: 'bold', fontSize: 16 },
-  linkText:  { color: colors.TEXTO_SECUNDARIO, marginTop: 16, textAlign: 'center' },
+  container: {
+    flex: 1,
+    backgroundColor: colors.FONDO,
+    justifyContent: 'center',
+    padding: 20,
+  },
+  title: {
+    fontSize: 28,
+    color: colors.TEXTO_PRINCIPAL,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 30,
+  },
+  input: {
+    backgroundColor: colors.FONDO_CARDS,
+    color: colors.TEXTO_PRINCIPAL,
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 16,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 24,
+  },
+  footerText: {
+    color: colors.TEXTO_SECUNDARIO,
+    marginRight: 4,
+  },
+  link: {
+    color: colors.PRIMARIO,
+    fontWeight: 'bold',
+  },
 });
