@@ -1,81 +1,69 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
-  TextInput,
-  StyleSheet,
-  Button,
-  Image,
-  TouchableOpacity,
-  Alert,
-  ScrollView,
-  KeyboardAvoidingView,
+  Text,
+  FlatList,
+  ActivityIndicator,
+  Animated,
   Platform,
+  StyleSheet,
 } from 'react-native';
-
-import * as ImagePicker from 'expo-image-picker';
+import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { db } from '../firebaseConfig';
+import PostItem from './PostItem';
 import { colors } from '../global/colors';
 
-const PostHome = ({ onPost }) => {
-  const [text, setText] = useState('');
-  const [image, setImage] = useState(null);
+const PostHome = () => {
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const [showHeader, setShowHeader] = useState(true);
+  let offsetY = 0;
 
-  const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.7,
+  useEffect(() => {
+    const postsRef = collection(db, 'posts');
+    const q = query(postsRef, orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      setPosts(data);
+      setLoading(false);
     });
 
-    if (!result.canceled && result.assets?.length > 0) {
-      setImage(result.assets[0].uri);
-    }
+    return () => unsubscribe();
+  }, []);
+
+  const handleScroll = (event) => {
+    const currentOffset = event.nativeEvent.contentOffset.y;
+    const direction = currentOffset > offsetY ? 'down' : 'up';
+    setShowHeader(direction === 'up');
+    offsetY = currentOffset;
   };
 
-  const handleSubmit = () => {
-    if (!text.trim() && !image) {
-      Alert.alert('Publicación vacía', 'Escribí algo o subí una imagen.');
-      return;
-    }
-
-    onPost({ text, image });
-    setText('');
-    setImage(null);
-  };
+  if (loading) {
+    return (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color={colors.PRIMARIO} />
+      </View>
+    );
+  }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.container}
-    >
-      <ScrollView
-        style={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-      >
-        <TextInput
-          style={styles.input}
-          placeholder="¿En qué estás pensando?"
-          placeholderTextColor={colors.TEXTO_SECUNDARIO}
-          multiline
-          scrollEnabled
-          value={text}
-          onChangeText={setText}
-        />
-
-        {image && (
-          <Image source={{ uri: image }} style={styles.previewImage} />
-        )}
-
-        <View style={styles.buttonsContainer}>
-          <TouchableOpacity style={styles.button} onPress={pickImage}>
-            <Button title="Subir imagen" color={colors.PRIMARIO} onPress={pickImage} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-            <Button title="Publicar" color={colors.PRIMARIO} onPress={handleSubmit} />
-          </TouchableOpacity>
+    <View style={styles.container}>
+      {showHeader && (
+        <View style={styles.header}>
+          <Text style={styles.headerText}>Últimos posts</Text>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      )}
+
+      <FlatList
+        data={posts}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => <PostItem post={item} />}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        contentContainerStyle={{ padding: 16 }}
+      />
+    </View>
   );
 };
 
@@ -83,41 +71,23 @@ export default PostHome;
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.FONDO_CARDS,
-    padding: 12,
-    borderRadius: 12,
-    margin: 16,
-    shadowColor: colors.SOMBRA,
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  scroll: {
-    maxHeight: 250,
-  },
-  input: {
-    color: colors.TEXTO_PRINCIPAL,
-    borderBottomWidth: 1,
-    borderColor: colors.GRIS_INTERMEDIO,
-    paddingVertical: 10,
-    paddingHorizontal: 6,
-    minHeight: 80,
-    maxHeight: 200,
-    textAlignVertical: 'top',
-    marginBottom: 12,
-  },
-  previewImage: {
-    width: '100%',
-    height: 180,
-    borderRadius: 10,
-    marginBottom: 10,
-  },
-  buttonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  button: {
     flex: 1,
-    marginHorizontal: 5,
+    backgroundColor: colors.FONDO,
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  header: {
+    backgroundColor: colors.FONDO,
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.SOMBRA,
+  },
+  headerText: {
+    color: colors.TEXTO_PRINCIPAL,
+    fontSize: 20,
+    fontWeight: 'bold',
   },
 });

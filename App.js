@@ -1,3 +1,4 @@
+// App.js
 import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'react-native';
@@ -26,30 +27,28 @@ export default function App() {
       <NavigationContainer>
         <AuthContext.Consumer>
           {({ user }) => {
-            // Este bloque se encarga de redirigir a ProfileSetup si el perfil no está completo
+            // Redirijo a ProfileSetup si hace falta
             useEffect(() => {
               const checkProfile = async () => {
                 if (user) {
                   const userDoc = await getDoc(doc(db, 'users', user.uid));
                   const data = userDoc.data();
-                  if (data?.profileCompleted) {
-                    setInitialScreen('Home');
-                  } else {
-                    setInitialScreen('ProfileSetup');
-                  }
+                  setInitialScreen(data?.profileCompleted ? 'Home' : 'ProfileSetup');
                 } else {
                   setInitialScreen('Auth');
                 }
                 setCheckingProfile(false);
               };
-
               checkProfile();
             }, [user]);
 
             if (checkingProfile) return null;
 
             return (
-              <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={initialScreen}>
+              <Stack.Navigator
+                screenOptions={{ headerShown: false }}
+                initialRouteName={initialScreen}
+              >
                 {!user ? (
                   <>
                     <Stack.Screen name="Auth" component={AuthScreen} />
@@ -59,7 +58,10 @@ export default function App() {
                 ) : (
                   <>
                     <Stack.Screen name="Home" component={Home} />
-                    <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
+                    <Stack.Screen
+                      name="ProfileSetup"
+                      component={ProfileSetupScreen}
+                    />
                   </>
                 )}
               </Stack.Navigator>
