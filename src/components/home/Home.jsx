@@ -6,11 +6,16 @@ import {
   StyleSheet,
   StatusBar,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import PostHome from './PostHome';
 import PostItem from './PostItem';
 import { colors } from '../global/colors';
 import { Ionicons } from '@expo/vector-icons';
+import { signOut } from 'firebase/auth';
+import { auth } from '../firebaseConfig.js';
+
+
 
 const POST_HOME_HEIGHT = 160;
 const SCROLL_TOP_THRESHOLD = 300;
@@ -52,8 +57,38 @@ const Home = () => {
     flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
   };
 
+  const handleLogoutPress = () => {
+    Alert.alert(
+      'Cerrar sesión',
+      '¿Estás seguro de que querés cerrar sesión?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sí',
+          onPress: async () => {
+            try {
+              await signOut(auth);
+              console.log('🔒 Sesión cerrada');
+            } catch (error) {
+              console.log('Error al cerrar sesión:', error.message);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const user = auth.currentUser;
+
   return (
     <View style={styles.container}>
+      {/* Icono de logout arriba a la derecha si hay usuario */}
+      {user && (
+        <TouchableOpacity style={styles.logoutIcon} onPress={handleLogoutPress}>
+          <Ionicons name="log-out-outline" size={28} color={colors.TEXTO_SECUNDARIO} />
+        </TouchableOpacity>
+      )}
+
       <Animated.View
         style={[
           styles.postHomeContainer,
@@ -114,6 +149,13 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 4,
     elevation: 6,
+  },
+  logoutIcon: {
+    position: 'absolute',
+    top: StatusBar.currentHeight || 10,
+    right: 16,
+    zIndex: 20,
+    padding: 8,
   },
 });
 

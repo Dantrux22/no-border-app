@@ -1,30 +1,45 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { colors } from '../global/colors';
+// src/components/auth/AuthProvider.jsx
+import React, { createContext, useEffect, useState } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../firebaseConfig';
 
-const AuthScreen = ({ navigation }) => {
+export const AuthContext = createContext();
+
+const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [profileComplete, setProfileComplete] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
+        const docRef = doc(db, 'users', currentUser.uid);
+        const userDoc = await getDoc(docRef);
+        const isComplete = userDoc.exists() && userDoc.data().profileCompleted;
+        setProfileComplete(isComplete);
+      } else {
+        setUser(null);
+        setProfileComplete(false);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  if (loading) return null;
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Bienvenido a No Border</Text>
-
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => navigation.navigate('Register')}
-      >
-        <Text style={styles.buttonText}>Registrarse</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.button, styles.secondaryButton]}
-        onPress={() => navigation.navigate('Login')}
-      >
-        <Text style={styles.buttonText}>Iniciar sesión</Text>
-      </TouchableOpacity>
-    </View>
+    <AuthContext.Provider value={{ user, profileComplete }}>
+      {children}
+    </AuthContext.Provider>
   );
 };
 
-export default AuthScreen;
+export default AuthProvider;
+
 
 const styles = StyleSheet.create({
   container: {
