@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 // App.js
 import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
@@ -17,19 +16,12 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from './src/components/firebaseConfig';
 
 const Stack = createNativeStackNavigator();
-=======
-import { SafeAreaView, StyleSheet, StatusBar } from 'react-native';
-import Header from './src/components/Header';
-import Home from './src/components/home/Home';
-import { colors } from './src/components/global/colors';
->>>>>>> parent of 0c09732 (integracion)
 
 export default function App() {
   const [checkingProfile, setCheckingProfile] = useState(true);
   const [initialScreen, setInitialScreen] = useState('Auth');
 
   return (
-<<<<<<< HEAD
     <AuthProvider>
       <StatusBar barStyle="light-content" backgroundColor={colors.FONDO} />
       <NavigationContainer>
@@ -78,12 +70,5 @@ export default function App() {
         </AuthContext.Consumer>
       </NavigationContainer>
     </AuthProvider>
-=======
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.FONDO} />
-      <Header title="No Border" />
-      <Home />
-    </SafeAreaView>
->>>>>>> parent of 0c09732 (integracion)
   );
 }
