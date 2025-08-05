@@ -1,18 +1,19 @@
 // src/components/firebaseConfig.js
 
-// 1️⃣ Importes de Firebase App y módulos de servicio
-import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
+// 1️⃣ Importa e inicializa Firebase App
+import { initializeApp, getApps, getApp } from 'firebase/app';
 
-// 2️⃣ Importes necesarios para Auth con persistencia en React Native
-import {
-  initializeAuth,
-  getReactNativePersistence
-} from 'firebase/auth';
+// 2️⃣ Configuración de Auth con persistencia en AsyncStorage
+import { initializeAuth, getAuth, getReactNativePersistence } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// 3️⃣ Tu configuración de Firebase (reemplaza con tus credenciales reales)
+// 3️⃣ Importar e inicializar Firestore con long-polling
+import { initializeFirestore, getFirestore } from 'firebase/firestore';
+
+// 4️⃣ Importar Storage
+import { getStorage } from 'firebase/storage';
+
+// 5️⃣ Tus credenciales de Firebase (reemplaza con las tuyas)
 const firebaseConfig = {
   apiKey: 'AIzaSyAYEs940csQs3OoiNpXQ3D-Q8YvZQVg4Xk',
   authDomain: 'no-border-app.firebaseapp.com',
@@ -22,14 +23,31 @@ const firebaseConfig = {
   appId: '1:189028890663:web:08aed1f6dec9c10e07f602',
 };
 
-// 4️⃣ Inicializar la app de Firebase
-const app = initializeApp(firebaseConfig);
+// 6️⃣ Inicializa (o reutiliza) la app
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// 5️⃣ Inicializar Auth con persistencia en AsyncStorage
-export const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(AsyncStorage)
-});
+// 7️⃣ Inicializa Auth con persistencia (solo una vez)
+let auth;
+try {
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(AsyncStorage)
+  });
+} catch (error) {
+  auth = getAuth(app);
+}
 
-// 6️⃣ Exportar Firestore y Storage como antes
-export const db      = getFirestore(app);
+// 8️⃣ Inicializa Firestore con opciones para evitar streams (solo una vez)
+let db;
+if (!global.__dbInitialized) {
+  db = initializeFirestore(app, {
+    experimentalForceLongPolling: true,
+    useFetchStreams: false,
+  });
+  global.__dbInitialized = true;
+} else {
+  db = getFirestore(app);
+}
+// 9️⃣ Inicializa Storage
 export const storage = getStorage(app);
+
+export { auth, db };
