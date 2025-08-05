@@ -24,7 +24,7 @@ const ProfileSetupScreen = () => {
   const pickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ImagePicker.MediaType.Images, // ⚠️ actualizado
         allowsEditing: true,
         quality: 1,
       });
@@ -46,6 +46,10 @@ const ProfileSetupScreen = () => {
         return;
       }
 
+      console.log('👤 Usuario autenticado:', currentUser.uid);
+      console.log('📝 Nombre de usuario:', username);
+      console.log('🖼️ URI de imagen:', image);
+
       let imageUrl = null;
 
       if (image) {
@@ -56,6 +60,7 @@ const ProfileSetupScreen = () => {
         await uploadBytes(storageRef, blob);
 
         imageUrl = await getDownloadURL(storageRef);
+        console.log('✅ Imagen subida:', imageUrl);
       }
 
       await setDoc(
@@ -68,7 +73,7 @@ const ProfileSetupScreen = () => {
         { merge: true }
       );
 
-      console.log('✅ Perfil guardado');
+      console.log('✅ Perfil guardado en Firestore');
       Alert.alert('Perfil guardado', 'Tu perfil se guardó correctamente');
       navigation.navigate('Home');
     } catch (error) {
