@@ -1,64 +1,109 @@
 // src/components/auth/RegisterScreen.jsx
+
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
+  KeyboardAvoidingView,
+  Platform,
   TextInput,
-  TouchableOpacity,
+  Button,
+  Text,
   StyleSheet,
-  Alert,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../firebaseConfig';
+import { auth, db, storage } from '../firebaseConfig';
 import { colors } from '../global/colors';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { doc, setDoc } from 'firebase/firestore';
+import * as ImagePicker from 'react-native-image-picker';
 
-const RegisterScreen = () => {
+export default function RegisterScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const navigation = useNavigation();
+  const [username, setUsername] = useState('');
+  const [avatar, setAvatar] = useState(null);
+  const [error, setError] = useState('');
+
+  const pickImage = () => {
+    ImagePicker.launchImageLibrary(
+      { mediaType: 'photo', quality: 0.7 },
+      (response) => {
+        if (response.didCancel || response.errorCode) return;
+        setAvatar(response.assets[0]);
+      }
+    );
+  };
 
   const handleRegister = async () => {
+    if (!username || !avatar) {
+      setError('Debes elegir un nombre de usuario y una foto.');
+      return;
+    }
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
-      console.log('✅ Registro exitoso');
-      navigation.navigate('ProfileSetup'); // O a donde quieras
-    } catch (error) {
-      console.log('❌ Error al registrar:', error.message);
-      Alert.alert('Error', error.message);
+      const userCred = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      const uid = userCred.user.uid;
+
+      // Subir avatar
+      const imgRef = ref(storage, `avatars/${uid}`);
+      const resp = await fetch(avatar.uri);
+      const blob = await resp.blob();
+      await uploadBytes(imgRef, blob);
+      const avatarURL = await getDownloadURL(imgRef);
+
+      // Guardar perfil
+      await setDoc(doc(db, 'users', uid), {
+        username,
+        avatar: avatarURL,
+        email,
+        createdAt: new Date(),
+      });
+
+      // Navegar
+      navigation.replace('ProfileSetupScreen');
+    } catch (err) {
+      setError(err.message);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Bienvenido Sonoborders</Text>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <TextInput
-        style={styles.input}
         placeholder="Email"
         placeholderTextColor={colors.TEXTO_SECUNDARIO}
-        onChangeText={setEmail}
+        style={styles.input}
         value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
         autoCapitalize="none"
       />
       <TextInput
-        style={styles.input}
         placeholder="Contraseña"
         placeholderTextColor={colors.TEXTO_SECUNDARIO}
-        secureTextEntry
-        onChangeText={setPassword}
+        style={styles.input}
         value={password}
+        onChangeText={setPassword}
+        secureTextEntry
       />
-      <TouchableOpacity style={styles.button} onPress={handleRegister}>
-        <Text style={styles.buttonText}>Registrarse</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-        <Text style={styles.linkText}>¿Ya tenés cuenta? Iniciá sesión</Text>
-      </TouchableOpacity>
-    </View>
+      <TextInput
+        placeholder="Nombre de usuario"
+        placeholderTextColor={colors.TEXTO_SECUNDARIO}
+        style={styles.input}
+        value={username}
+        onChangeText={setUsername}
+      />
+      <Button title="Seleccionar foto de perfil" onPress={pickImage} />
+      {avatar && <Text style={styles.selected}>✔️ Foto seleccionada</Text>}
+      {!!error && <Text style={styles.error}>{error}</Text>}
+      <Button title="Registrarme" onPress={handleRegister} />
+    </KeyboardAvoidingView>
   );
-};
-
-export default RegisterScreen;
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -67,34 +112,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 20,
   },
-  title: {
+  input: {
+    height: 50,
+    borderColor: colors.TEXTO_SECUNDARIO,
+    borderWidth: 1,
+    marginBottom: 12,
     color: colors.TEXTO_PRINCIPAL,
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 24,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  error: {
+    color: 'red',
+    marginBottom: 12,
     textAlign: 'center',
   },
-  input: {
-    backgroundColor: colors.FONDO_CARDS,
-    color: colors.TEXTO_PRINCIPAL,
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 16,
-  },
-  button: {
-    backgroundColor: colors.PRIMARIO,
-    padding: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: colors.BLANCO,
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  linkText: {
-    color: colors.TEXTO_SECUNDARIO,
-    marginTop: 16,
+  selected: {
+    color: colors.PRIMARIO,
+    marginBottom: 12,
     textAlign: 'center',
   },
 });
