@@ -10,7 +10,6 @@ import LoginScreen from './src/components/auth/LoginScreen';
 import RegisterScreen from './src/components/auth/RegisterScreen';
 import Home from './src/components/home/Home';
 import ProfileSetupScreen from './src/components/ProfileSetupScreen';
-import { StyleSheet } from 'react-native';
 
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from './src/components/firebaseConfig';
