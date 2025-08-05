@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // src/components/auth/RegisterScreen.jsx
 import React, { useState } from 'react';
 import {
@@ -141,3 +142,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 });
+=======
+>>>>>>> parent of 0c09732 (integracion)
