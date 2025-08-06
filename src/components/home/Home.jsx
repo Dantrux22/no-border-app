@@ -1,4 +1,3 @@
-// src/components/home/Home.jsx
 import React, { useState, useContext } from 'react';
 import {
   SafeAreaView,
@@ -26,14 +25,26 @@ export default function Home() {
     setPosts([newPost, ...posts]);
   };
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      navigation.replace('Auth'); // Cambiado a Auth para volver al flujo de autenticación
-    } catch (error) {
-      console.error('Error al cerrar sesión:', error);
-      Alert.alert('Error', 'No se pudo cerrar sesión. Intentá de nuevo.');
-    }
+  const handleLogout = () => {
+    Alert.alert(
+      'Cerrar sesión',
+      '¿Estás seguro de que querés cerrar sesión?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sí, salir',
+          onPress: async () => {
+            try {
+              await signOut(auth);
+              navigation.replace('Auth'); // Asegurate que esta ruta exista en tu stack
+            } catch (error) {
+              console.error('Error al cerrar sesión:', error);
+            }
+          },
+          style: 'destructive',
+        },
+      ]
+    );
   };
 
   return (

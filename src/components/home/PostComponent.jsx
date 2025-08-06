@@ -1,4 +1,3 @@
-// src/components/home/PostComponent.jsx
 import React, { useState, useContext, useRef, useEffect } from 'react';
 import {
   View,
@@ -13,10 +12,12 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../global/colors';
 import { Ionicons } from '@expo/vector-icons';
-import { AuthContext } from '../auth/AuthProvider';
 import moment from 'moment';
+import 'moment/locale/es'; // ✅ Importa idioma español
 
-export default function PostComponent({ onAdd, disabled, username }) {
+moment.locale('es'); // ✅ Establece idioma español
+
+export default function PostComponent({ onAdd, disabled }) {
   const [text, setText] = useState('');
   const [imageUri, setImageUri] = useState(null);
 
@@ -72,7 +73,6 @@ export default function PostComponent({ onAdd, disabled, username }) {
 
   return (
     <View style={styles.postHomeContainer}>
-      <Text style={styles.username}>Hola, @{username || 'usuario'}</Text>
       <TextInput
         style={styles.input}
         placeholder="¿Qué estás pensando?"
@@ -175,12 +175,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  username: {
-    fontWeight: 'bold',
-    color: colors.TEXTO_PRINCIPAL,
-    marginBottom: 4,
-    paddingHorizontal: 16,
-  },
   input: {
     minHeight: 60,
     borderColor: colors.TEXTO_SECUNDARIO,
@@ -234,6 +228,12 @@ const styles = StyleSheet.create({
     height: 150,
     borderRadius: 0,
     marginBottom: 8,
+  },
+  username: {
+    fontWeight: 'bold',
+    color: colors.TEXTO_PRINCIPAL,
+    marginBottom: 4,
+    paddingHorizontal: 16,
   },
   time: {
     fontSize: 12,
