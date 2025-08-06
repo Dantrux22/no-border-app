@@ -23,7 +23,9 @@ export default function AuthProvider({ children }) {
       if (fbUser) {
         try {
           console.log('📄 Buscando perfil en Firestore para UID:', fbUser.uid);
-          const snap = await getDoc(doc(db, 'users', fbUser.uid));
+          const docRef = doc(db, 'users', fbUser.uid);
+          const snap = await getDoc(docRef);
+
           if (snap.exists()) {
             const userProfile = snap.data();
             console.log('✅ Perfil encontrado:', userProfile);
@@ -40,11 +42,11 @@ export default function AuthProvider({ children }) {
         setProfile(null);
       }
 
-      if (initializing) setInitializing(false);
+      setInitializing(false);
     });
 
-    return unsubscribe;
-  }, [initializing]);
+    return () => unsubscribe();
+  }, []);
 
   if (initializing) return null;
 

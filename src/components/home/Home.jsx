@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import {
   SafeAreaView,
   FlatList,
@@ -6,6 +6,7 @@ import {
   View,
   Alert,
   TouchableOpacity,
+  Text,
 } from 'react-native';
 import Header from '../Header';
 import { colors } from '../global/colors';
@@ -14,10 +15,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { auth } from '../firebaseConfig';
 import { signOut } from 'firebase/auth';
 import { useNavigation } from '@react-navigation/native';
+import { AuthContext } from '../auth/AuthProvider'; // ✅ para acceder al perfil
 
 export default function Home() {
   const [posts, setPosts] = useState([]);
   const navigation = useNavigation();
+  const { profile } = useContext(AuthContext);
 
   const handleAdd = newPost => {
     setPosts([newPost, ...posts]);
@@ -36,7 +39,7 @@ export default function Home() {
           text: 'Sí, salir',
           onPress: async () => {
             await signOut(auth);
-            navigation.replace('Login');
+            navigation.replace('Auth');
           },
           style: 'destructive',
         },
@@ -47,9 +50,16 @@ export default function Home() {
   return (
     <SafeAreaView style={styles.container}>
       <Header title="No Border" />
+
       <TouchableOpacity onPress={handleLogout} style={styles.logoutIcon}>
         <Ionicons name="log-out-outline" size={24} color={colors.BLANCO} />
       </TouchableOpacity>
+
+      {profile?.username && (
+        <View style={styles.greetingContainer}>
+          <Text style={styles.greetingText}>Hola, {profile.username} 👋</Text>
+        </View>
+      )}
 
       <PostComponent onAdd={handleAdd} />
       <FlatList
@@ -79,5 +89,13 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 20,
     elevation: 4,
+  },
+  greetingContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  greetingText: {
+    fontSize: 18,
+    color: colors.TEXTO_PRINCIPAL,
   },
 });
