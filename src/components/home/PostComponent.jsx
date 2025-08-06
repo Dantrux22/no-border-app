@@ -64,7 +64,7 @@ export default function PostComponent({ onAdd, disabled, username }) {
       text: text.trim(),
       imageUrl: imageUri,
       createdAt: new Date().toISOString(),
-      username: username, // ✅ lo agregamos a cada post
+      username: username || 'usuario',
     });
     setText('');
     setImageUri(null);
@@ -72,9 +72,6 @@ export default function PostComponent({ onAdd, disabled, username }) {
 
   return (
     <View style={styles.postHomeContainer}>
-      <Text style={{ color: colors.TEXTO_PRINCIPAL, marginBottom: 8 }}>
-        Hola @{username}
-      </Text>
       <TextInput
         style={styles.input}
         placeholder="¿Qué estás pensando?"
@@ -163,6 +160,7 @@ export function PostItem({ post, username }) {
     </Animated.View>
   );
 }
+
 const styles = StyleSheet.create({
   postHomeContainer: {
     backgroundColor: colors.FONDO_CARDS,
