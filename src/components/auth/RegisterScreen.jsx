@@ -1,5 +1,3 @@
-// src/screens/RegisterScreen.jsx
-
 import React, { useState } from 'react';
 import {
   KeyboardAvoidingView,
@@ -10,113 +8,149 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  ActivityIndicator,
+  StatusBar,
 } from 'react-native';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth, db } from '../firebaseConfig';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { useNavigation } from '@react-navigation/native';
 import { colors } from '../global/colors';
 
-export default function RegisterScreen({ navigation }) {
-  const [email, setEmail]       = useState('');
+export default function RegisterScreen() {
+  const navigation = useNavigation();
+
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleRegister = () => {
-    if (!email.trim() || !password || !username.trim()) {
-      return Alert.alert('Error', 'Todos los campos son obligatorios.');
+  const handleRegister = async () => {
+    if (!email || !password || !username) {
+      Alert.alert('Completa todos los campos');
+      return;
     }
-    navigation.replace('Home');
+
+    try {
+      setLoading(true);
+      console.log('🚀 handleRegister start');
+
+      const res = await createUserWithEmailAndPassword(auth, email, password);
+      console.log('✅ Usuario creado UID:', res.user.uid);
+
+      const userData = {
+        email,
+        username,
+        createdAt: serverTimestamp(),
+      };
+
+      console.log('📄 Guardando perfil:', userData);
+
+      await setDoc(doc(db, 'users', res.user.uid), userData);
+      console.log('✅ Perfil guardado en Firestore');
+
+      Alert.alert('Registro exitoso', 'Iniciá sesión con tu nueva cuenta');
+      navigation.replace('Login');
+    } catch (error) {
+      console.log('❌ Error en el registro:', error.message);
+      Alert.alert('Error al registrar', error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <KeyboardAvoidingView
-      style={styles.keyboard}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={styles.container}
     >
-      <View style={styles.innerContainer}>
-        <Text style={styles.header}>Registrarse en No Border</Text>
+      <StatusBar barStyle="light-content" backgroundColor={colors.FONDO} />
 
-        <TextInput
-          placeholder="Email"
-          placeholderTextColor={colors.TEXTO_SECUNDARIO}
-          style={styles.input}
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
+      <Text style={styles.title}>Bienvenido a No Border</Text>
 
-        <TextInput
-          placeholder="Contraseña"
-          placeholderTextColor={colors.TEXTO_SECUNDARIO}
-          style={styles.input}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
+      <TextInput
+        style={styles.input}
+        placeholder="Correo electrónico"
+        placeholderTextColor={colors.TEXTO_SECUNDARIO}
+        value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
+        autoCapitalize="none"
+      />
 
-        <TextInput
-          placeholder="Nombre de usuario"
-          placeholderTextColor={colors.TEXTO_SECUNDARIO}
-          style={styles.input}
-          value={username}
-          onChangeText={setUsername}
-        />
+      <TextInput
+        style={styles.input}
+        placeholder="Nombre de usuario"
+        placeholderTextColor={colors.TEXTO_SECUNDARIO}
+        value={username}
+        onChangeText={setUsername}
+      />
 
-        <TouchableOpacity style={styles.button} onPress={handleRegister}>
+      <TextInput
+        style={styles.input}
+        placeholder="Contraseña"
+        placeholderTextColor={colors.TEXTO_SECUNDARIO}
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+      />
+
+      <TouchableOpacity
+        style={styles.button}
+        onPress={handleRegister}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
           <Text style={styles.buttonText}>Crear cuenta</Text>
-        </TouchableOpacity>
+        )}
+      </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => navigation.replace('Login')}>
-          <Text style={styles.link}>¿Ya tienes cuenta? Iniciar sesión</Text>
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity onPress={() => navigation.replace('Login')}>
+        <Text style={styles.loginText}>¿Ya tenés una cuenta? Iniciá sesión</Text>
+      </TouchableOpacity>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  keyboard: {
+  container: {
     flex: 1,
     backgroundColor: colors.FONDO,
-  },
-  innerContainer: {
-    flex: 1,
+    padding: 20,
     justifyContent: 'center',
-    alignItems: 'stretch',
-    paddingHorizontal: 20,
   },
-  header: {
-    fontSize: 24,
-    color: colors.TEXTO_PRINCIPAL,
+  title: {
+    fontSize: 26,
     fontWeight: 'bold',
-    marginBottom: 24,
+    marginBottom: 30,
+    color: colors.TEXTO_PRINCIPAL,
     textAlign: 'center',
   },
   input: {
-    width: '100%',
-    height: 50,
-    borderColor: colors.TEXTO_SECUNDARIO,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    marginBottom: 16,
+    backgroundColor: colors.FONDO_CARDS,
     color: colors.TEXTO_PRINCIPAL,
+    height: 50,
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    marginBottom: 15,
   },
   button: {
-    width: '100%',
     backgroundColor: colors.PRIMARIO,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
+    padding: 15,
+    borderRadius: 10,
     alignItems: 'center',
-    marginVertical: 16,
+    marginBottom: 10,
   },
   buttonText: {
     color: colors.BLANCO,
-    fontSize: 16,
     fontWeight: 'bold',
+    fontSize: 16,
   },
-  link: {
+  loginText: {
     color: colors.TEXTO_SECUNDARIO,
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: 10,
   },
 });

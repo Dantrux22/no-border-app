@@ -1,9 +1,10 @@
 // src/components/firebaseConfig.js
+
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
   initializeAuth,
-  getReactNativePersistence,
   getAuth,
+  getReactNativePersistence,
 } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -13,6 +14,7 @@ import {
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
+// 🔐 Tu config de Firebase
 const firebaseConfig = {
   apiKey: 'AIzaSyAYEs940csQs3OoiNpXQ3D-Q8YvZQVg4Xk',
   authDomain: 'no-border-app.firebaseapp.com',
@@ -22,31 +24,38 @@ const firebaseConfig = {
   appId: '1:189028890663:web:08aed1f6dec9c10e07f602',
 };
 
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+// ⚡ Inicializamos app (solo una vez)
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// 🛡️ Asegurarse de inicializar Auth solo una vez
+// 🔑 Auth con AsyncStorage
 let auth;
 try {
-  auth = getAuth(app); // Esto falla si no fue inicializado antes
-} catch {
+  auth = getAuth(app);
+} catch (error) {
   auth = initializeAuth(app, {
     persistence: getReactNativePersistence(AsyncStorage),
   });
 }
 
+// 🔥 Firestore con long polling (solo una vez)
 let db;
-if (!global.__firestoreInitialized) {
+if (!global._firestoreInitialized) {
   db = initializeFirestore(app, {
     experimentalForceLongPolling: true,
     useFetchStreams: false,
   });
-  global.__firestoreInitialized = true;
+  global._firestoreInitialized = true;
 } else {
   db = getFirestore(app);
 }
 
-export { auth, db };
-export const storage = getStorage(app);
+// ☁️ Storage
+const storage = getStorage(app);
+
+// 🔇 Silenciar logs de Firestore (opcional)
 try {
   setLogLevel('silent');
 } catch {}
+
+// ✅ Exportar instancias
+export { auth, db, storage };

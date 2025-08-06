@@ -1,7 +1,4 @@
-// src/components/auth/LoginScreen.jsx
-
-import React, { useState } from 'react';
-import { useNavigation } from '@react-navigation/native';
+import React, { useState, useContext, useEffect } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -11,85 +8,134 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  ActivityIndicator,
+  StatusBar,
 } from 'react-native';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebaseConfig';
+import { useNavigation } from '@react-navigation/native';
+import { AuthContext } from './AuthProvider';
 import { colors } from '../global/colors';
 
 export default function LoginScreen() {
   const navigation = useNavigation();
-  const [email, setEmail]       = useState('');
+  const { user } = useContext(AuthContext);
+
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // Si hay usuario logueado, redirigimos al Home
+  useEffect(() => {
+    if (user) {
+      navigation.replace('Home');
+    }
+  }, [user]);
 
   const handleLogin = async () => {
-    if (!email.trim() || !password) {
-      return Alert.alert('Error', 'Email y contraseña son obligatorios.');
+    if (!email || !password) {
+      Alert.alert('Completa todos los campos');
+      return;
     }
+
     try {
-      await signInWithEmailAndPassword(auth, email.trim(), password);
-      navigation.replace('Home');
-    } catch (err) {
-      Alert.alert('Error al iniciar sesión', err.message);
+      setLoading(true);
+      console.log('📥 Iniciando sesión:', email);
+      await signInWithEmailAndPassword(auth, email, password);
+      console.log('✅ Sesión iniciada correctamente');
+      // AuthProvider se encarga de redirigir
+    } catch (error) {
+      console.log('❌ Error al iniciar sesión:', error.message);
+      Alert.alert('Error', error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <KeyboardAvoidingView
-      style={styles.keyboard}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={styles.container}
     >
-      <View style={styles.inner}>
-        <Text style={styles.header}>Iniciar sesión en No Border</Text>
+      <StatusBar barStyle="light-content" backgroundColor={colors.FONDO} />
 
-        <TextInput
-          placeholder="Email"
-          placeholderTextColor={colors.TEXTO_SECUNDARIO}
-          style={styles.input}
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
+      <Text style={styles.title}>Iniciar sesión</Text>
 
-        <TextInput
-          placeholder="Contraseña"
-          placeholderTextColor={colors.TEXTO_SECUNDARIO}
-          style={styles.input}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
+      <TextInput
+        style={styles.input}
+        placeholder="Correo electrónico"
+        placeholderTextColor={colors.TEXTO_SECUNDARIO}
+        value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
+        autoCapitalize="none"
+      />
 
-        <TouchableOpacity style={styles.button} onPress={handleLogin}>
-          <Text style={styles.buttonText}>Iniciar sesión</Text>
-        </TouchableOpacity>
+      <TextInput
+        style={styles.input}
+        placeholder="Contraseña"
+        placeholderTextColor={colors.TEXTO_SECUNDARIO}
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+      />
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>¿No tienes cuenta?</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-            <Text style={styles.link}> Registrarse</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <TouchableOpacity
+        style={styles.button}
+        onPress={handleLogin}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.buttonText}>Ingresar</Text>
+        )}
+      </TouchableOpacity>
+
+      <TouchableOpacity onPress={() => navigation.replace('Register')}>
+        <Text style={styles.registerText}>¿No tenés cuenta? Registrate</Text>
+      </TouchableOpacity>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  keyboard: { flex: 1, backgroundColor: colors.FONDO },
-  inner:    { flex: 1, justifyContent: 'center', padding: 20 },
-  header:   { fontSize: 24, color: colors.TEXTO_PRINCIPAL, fontWeight: 'bold', marginBottom: 24, textAlign: 'center' },
-  input:    {
-    width: '100%', height: 50,
-    borderColor: colors.TEXTO_SECUNDARIO, borderWidth: 1, borderRadius: 8,
-    paddingHorizontal: 12, marginBottom: 16, color: colors.TEXTO_PRINCIPAL,
+  container: {
+    flex: 1,
+    backgroundColor: colors.FONDO,
+    padding: 20,
+    justifyContent: 'center',
   },
-  button:   {
-    width: '100%', backgroundColor: colors.PRIMARIO, height: 50,
-    borderRadius: 25, justifyContent: 'center', alignItems: 'center', marginBottom: 16,
+  title: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    marginBottom: 30,
+    color: colors.TEXTO_PRINCIPAL,
+    textAlign: 'center',
   },
-  buttonText: { color: colors.BLANCO, fontSize: 16, fontWeight: 'bold' },
-  footer:     { flexDirection: 'row', justifyContent: 'center' },
-  footerText: { color: colors.TEXTO_SECUNDARIO },
-  link:       { color: colors.PRIMARIO, fontWeight: 'bold', marginLeft: 4 },
+  input: {
+    backgroundColor: colors.FONDO_CARDS,
+    color: colors.TEXTO_PRINCIPAL,
+    height: 50,
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    marginBottom: 15,
+  },
+  button: {
+    backgroundColor: colors.PRIMARIO,
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  buttonText: {
+    color: colors.BLANCO,
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  registerText: {
+    color: colors.TEXTO_SECUNDARIO,
+    textAlign: 'center',
+    marginTop: 10,
+  },
 });

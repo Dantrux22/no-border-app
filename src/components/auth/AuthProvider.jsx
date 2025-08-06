@@ -1,5 +1,3 @@
-// src/components/auth/AuthProvider.jsx
-
 import React, { createContext, useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../firebaseConfig';
@@ -17,17 +15,35 @@ export default function AuthProvider({ children }) {
   const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (fbUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      console.log('👤 onAuthStateChanged ejecutado. fbUser:', fbUser);
+
       setUser(fbUser);
+
       if (fbUser) {
-        const snap = await getDoc(doc(db, 'users', fbUser.uid));
-        setProfile(snap.exists() ? snap.data() : null);
+        try {
+          console.log('📄 Buscando perfil en Firestore para UID:', fbUser.uid);
+          const snap = await getDoc(doc(db, 'users', fbUser.uid));
+          if (snap.exists()) {
+            const userProfile = snap.data();
+            console.log('✅ Perfil encontrado:', userProfile);
+            setProfile(userProfile);
+          } else {
+            console.warn('⚠️ No se encontró el perfil del usuario en Firestore');
+            setProfile(null);
+          }
+        } catch (error) {
+          console.error('❌ Error al obtener perfil del usuario:', error.message);
+          setProfile(null);
+        }
       } else {
         setProfile(null);
       }
+
       if (initializing) setInitializing(false);
     });
-    return unsub;
+
+    return unsubscribe;
   }, [initializing]);
 
   if (initializing) return null;
