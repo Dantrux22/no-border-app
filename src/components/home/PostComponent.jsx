@@ -1,5 +1,5 @@
 // src/components/home/PostComponent.jsx
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useContext, useRef, useEffect } from 'react';
 import {
   View,
   TextInput,
@@ -13,6 +13,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../global/colors';
 import { Ionicons } from '@expo/vector-icons';
+import { AuthContext } from '../auth/AuthProvider';
 import moment from 'moment';
 
 export default function PostComponent({ onAdd, disabled, username }) {
@@ -64,7 +65,6 @@ export default function PostComponent({ onAdd, disabled, username }) {
       text: text.trim(),
       imageUrl: imageUri,
       createdAt: new Date().toISOString(),
-      username: username || 'usuario',
     });
     setText('');
     setImageUri(null);
@@ -72,6 +72,7 @@ export default function PostComponent({ onAdd, disabled, username }) {
 
   return (
     <View style={styles.postHomeContainer}>
+      <Text style={styles.username}>Hola, @{username || 'usuario'}</Text>
       <TextInput
         style={styles.input}
         placeholder="¿Qué estás pensando?"
@@ -132,7 +133,7 @@ export function PostItem({ post, username }) {
 
   return (
     <Animated.View style={[styles.card, { opacity: fadeIn }]}>
-      <Text style={styles.username}>@{post.username || username || 'usuario'}</Text>
+      <Text style={styles.username}>@{username || 'usuario'}</Text>
       {post.createdAt && (
         <Text style={styles.time}>{moment(post.createdAt).fromNow()}</Text>
       )}
@@ -173,6 +174,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  username: {
+    fontWeight: 'bold',
+    color: colors.TEXTO_PRINCIPAL,
+    marginBottom: 4,
+    paddingHorizontal: 16,
   },
   input: {
     minHeight: 60,
@@ -227,12 +234,6 @@ const styles = StyleSheet.create({
     height: 150,
     borderRadius: 0,
     marginBottom: 8,
-  },
-  username: {
-    fontWeight: 'bold',
-    color: colors.TEXTO_PRINCIPAL,
-    marginBottom: 4,
-    paddingHorizontal: 16,
   },
   time: {
     fontSize: 12,
