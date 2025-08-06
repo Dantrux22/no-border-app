@@ -1,7 +1,11 @@
 // src/components/firebaseConfig.js
-
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import {
+  initializeAuth,
+  getReactNativePersistence,
+  getAuth,
+} from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   initializeFirestore,
   getFirestore,
@@ -18,11 +22,17 @@ const firebaseConfig = {
   appId: '1:189028890663:web:08aed1f6dec9c10e07f602',
 };
 
-const app = !getApps().length
-  ? initializeApp(firebaseConfig)
-  : getApp();
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-export const auth = getAuth(app);
+// 🛡️ Asegurarse de inicializar Auth solo una vez
+let auth;
+try {
+  auth = getAuth(app); // Esto falla si no fue inicializado antes
+} catch {
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(AsyncStorage),
+  });
+}
 
 let db;
 if (!global.__firestoreInitialized) {
@@ -34,8 +44,9 @@ if (!global.__firestoreInitialized) {
 } else {
   db = getFirestore(app);
 }
-export { db };
 
-try { setLogLevel('silent'); } catch {}
-
+export { auth, db };
 export const storage = getStorage(app);
+try {
+  setLogLevel('silent');
+} catch {}

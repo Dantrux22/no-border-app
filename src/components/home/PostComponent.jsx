@@ -1,5 +1,5 @@
 // src/components/home/PostComponent.jsx
-import React, { useState } from 'react';
+import React, { useState, useContext, useRef, useEffect } from 'react';
 import {
   View,
   TextInput,
@@ -14,10 +14,15 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../global/colors';
 import { Ionicons } from '@expo/vector-icons';
+import moment from 'moment';
+import 'moment/locale/es';
+moment.locale('es');
+import { AuthContext } from '../auth/AuthProvider';
 
 export default function PostComponent({ onAdd }) {
   const [text, setText] = useState('');
   const [imageUri, setImageUri] = useState(null);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const requestPermissions = async () => {
     const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
@@ -62,7 +67,7 @@ export default function PostComponent({ onAdd }) {
 
   const handleAdd = () => {
     if (!text.trim() && !imageUri) return;
-    onAdd({ id: Date.now().toString(), text: text.trim(), imageUrl: imageUri });
+    onAdd({ id: Date.now().toString(), text: text.trim(), imageUrl: imageUri, createdAt: new Date().toISOString() });
     setText('');
     setImageUri(null);
   };
@@ -94,6 +99,16 @@ export function PostItem({ post }) {
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
   const scale = useState(new Animated.Value(1))[0];
+  const fadeIn = useRef(new Animated.Value(0)).current;
+  const { profile } = useContext(AuthContext);
+
+  useEffect(() => {
+    Animated.timing(fadeIn, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+  }, []);
 
   const handleLike = () => {
     setLiked(!liked);
@@ -108,8 +123,9 @@ export function PostItem({ post }) {
   };
 
   return (
-    <View style={styles.card}>
-      <Text style={styles.username}>@usuario</Text>
+    <Animated.View style={[styles.card, { opacity: fadeIn }]}>
+      <Text style={styles.username}>@{profile?.username || 'usuario'}</Text>
+      {post.createdAt && <Text style={styles.time}>{moment(post.createdAt).fromNow()}</Text>}
       {post.imageUrl && <Image source={{ uri: post.imageUrl }} style={styles.image} />}
       <Text style={styles.text}>{post.text}</Text>
       <View style={styles.actions}>
@@ -131,7 +147,7 @@ export function PostItem({ post }) {
           />
         </TouchableOpacity>
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -206,8 +222,14 @@ const styles = StyleSheet.create({
   username: {
     fontWeight: 'bold',
     color: colors.TEXTO_PRINCIPAL,
-    marginBottom: 6,
+    marginBottom: 4,
     paddingHorizontal: 16,
+  },
+  time: {
+    fontSize: 12,
+    color: colors.TEXTO_SECUNDARIO,
+    paddingHorizontal: 16,
+    marginBottom: 6,
   },
   text: {
     color: colors.TEXTO_PRINCIPAL,
