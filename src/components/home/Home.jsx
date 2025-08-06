@@ -20,28 +20,20 @@ import { AuthContext } from '../auth/AuthProvider';
 export default function Home() {
   const [posts, setPosts] = useState([]);
   const navigation = useNavigation();
-  const { profile } = useContext(AuthContext); // Agregamos el perfil
+  const { profile } = useContext(AuthContext);
 
   const handleAdd = (newPost) => {
     setPosts([newPost, ...posts]);
   };
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Cerrar sesión',
-      '¿Estás seguro de que querés cerrar sesión?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Sí, salir',
-          onPress: async () => {
-            await signOut(auth);
-            navigation.replace('Login');
-          },
-          style: 'destructive',
-        },
-      ]
-    );
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      navigation.replace('Auth'); // Cambiado a Auth para volver al flujo de autenticación
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+      Alert.alert('Error', 'No se pudo cerrar sesión. Intentá de nuevo.');
+    }
   };
 
   return (
@@ -53,13 +45,15 @@ export default function Home() {
 
       <PostComponent
         onAdd={handleAdd}
-        username={profile?.username || 'usuario'} // ✅ Le pasamos el nombre
+        username={profile?.username || 'usuario'}
       />
 
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <PostItem post={item} username={profile?.username || 'usuario'} />}
+        renderItem={({ item }) => (
+          <PostItem post={item} username={profile?.username || 'usuario'} />
+        )}
         contentContainerStyle={styles.feed}
       />
     </SafeAreaView>
