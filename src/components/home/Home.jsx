@@ -1,3 +1,4 @@
+// src/components/home/Home.jsx
 import React, { useState, useContext } from 'react';
 import {
   SafeAreaView,
@@ -36,7 +37,10 @@ export default function Home() {
           onPress: async () => {
             try {
               await signOut(auth);
-              navigation.replace('Auth'); // Asegurate que esta ruta exista en tu stack
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Auth' }],
+              });
             } catch (error) {
               console.error('Error al cerrar sesión:', error);
             }
