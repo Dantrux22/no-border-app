@@ -1,3 +1,4 @@
+// src/components/auth/AuthProvider.jsx
 import React, { createContext, useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../firebaseConfig';
@@ -12,46 +13,44 @@ export const AuthContext = createContext({
 export default function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [initializing, setInitializing] = useState(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       console.log('👤 onAuthStateChanged ejecutado. fbUser:', fbUser);
-
       setUser(fbUser);
 
       if (fbUser) {
         try {
-          console.log('📄 Buscando perfil en Firestore para UID:', fbUser.uid);
           const docRef = doc(db, 'users', fbUser.uid);
           const snap = await getDoc(docRef);
 
           if (snap.exists()) {
             const userProfile = snap.data();
-            console.log('✅ Perfil encontrado:', userProfile);
             setProfile(userProfile);
+            console.log('✅ Perfil encontrado:', userProfile);
           } else {
             console.warn('⚠️ No se encontró el perfil del usuario en Firestore');
-            setProfile(null);
+            setProfile({ username: 'usuario' }); // fallback
           }
         } catch (error) {
-          console.error('❌ Error al obtener perfil del usuario:', error.message);
-          setProfile(null);
+          console.error('❌ Error al obtener perfil:', error.message);
+
+          // fallback para modo offline
+          setProfile({ username: 'usuario' });
         }
       } else {
         setProfile(null);
       }
 
-      setInitializing(false);
+      setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
-  if (initializing) return null;
-
   return (
-    <AuthContext.Provider value={{ user, profile, setProfile }}>
+    <AuthContext.Provider value={{ user, profile, setProfile, loading }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,5 +1,5 @@
 // src/components/home/PostComponent.jsx
-import React, { useState, useContext, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   TextInput,
@@ -7,33 +7,25 @@ import {
   Text,
   Image,
   StyleSheet,
-  Platform,
-  Animated,
   Alert,
+  Animated,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../global/colors';
 import { Ionicons } from '@expo/vector-icons';
 import moment from 'moment';
-import 'moment/locale/es';
-moment.locale('es');
-import { AuthContext } from '../auth/AuthProvider';
 
-export default function PostComponent({ onAdd }) {
+export default function PostComponent({ onAdd, disabled, username }) {
   const [text, setText] = useState('');
   const [imageUri, setImageUri] = useState(null);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-
-  const requestPermissions = async () => {
-    const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
-    const { status: mediaStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    return cameraStatus === 'granted' && mediaStatus === 'granted';
-  };
 
   const pickImage = async () => {
-    const hasPermission = await requestPermissions();
-    if (!hasPermission) {
-      return Alert.alert('Permiso requerido', 'Otorgá permisos para cámara y galería');
+    const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
+    const { status: mediaStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (cameraStatus !== 'granted' || mediaStatus !== 'granted') {
+      Alert.alert('Permiso requerido', 'Otorgá permisos para cámara y galería');
+      return;
     }
 
     Alert.alert('Seleccionar imagen', '¿De dónde querés subir la imagen?', [
@@ -67,40 +59,59 @@ export default function PostComponent({ onAdd }) {
 
   const handleAdd = () => {
     if (!text.trim() && !imageUri) return;
-    onAdd({ id: Date.now().toString(), text: text.trim(), imageUrl: imageUri, createdAt: new Date().toISOString() });
+    onAdd({
+      id: Date.now().toString(),
+      text: text.trim(),
+      imageUrl: imageUri,
+      createdAt: new Date().toISOString(),
+      username: username, // ✅ lo agregamos a cada post
+    });
     setText('');
     setImageUri(null);
   };
 
   return (
     <View style={styles.postHomeContainer}>
+      <Text style={{ color: colors.TEXTO_PRINCIPAL, marginBottom: 8 }}>
+        Hola @{username}
+      </Text>
       <TextInput
         style={styles.input}
         placeholder="¿Qué estás pensando?"
         placeholderTextColor={colors.TEXTO_SECUNDARIO}
         value={text}
         onChangeText={setText}
+        editable={!disabled}
         multiline
       />
       {imageUri && <Image source={{ uri: imageUri }} style={styles.preview} />}
       <View style={styles.buttonRow}>
-        <TouchableOpacity onPress={pickImage} style={[styles.button, styles.imageButton]}>
+        <TouchableOpacity
+          onPress={pickImage}
+          style={[styles.button, styles.imageButton]}
+          disabled={disabled}
+        >
           <Text style={styles.buttonText}>📷 Foto</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={handleAdd} style={[styles.button, styles.postButton]}>
-          <Text style={styles.buttonText}>🚀 Publicar</Text>
+        <TouchableOpacity
+          onPress={handleAdd}
+          style={[styles.button, styles.postButton]}
+          disabled={disabled}
+        >
+          <Text style={styles.buttonText}>
+            {disabled ? 'Cargando...' : '🚀 Publicar'}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-export function PostItem({ post }) {
+export function PostItem({ post, username }) {
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
-  const scale = useState(new Animated.Value(1))[0];
+  const scale = useRef(new Animated.Value(1)).current;
   const fadeIn = useRef(new Animated.Value(0)).current;
-  const { profile } = useContext(AuthContext);
 
   useEffect(() => {
     Animated.timing(fadeIn, {
@@ -114,7 +125,7 @@ export function PostItem({ post }) {
     setLiked(!liked);
     Animated.sequence([
       Animated.timing(scale, { toValue: 1.4, duration: 150, useNativeDriver: true }),
-      Animated.timing(scale, { toValue: 1, duration: 150, useNativeDriver: true })
+      Animated.timing(scale, { toValue: 1, duration: 150, useNativeDriver: true }),
     ]).start();
   };
 
@@ -124,8 +135,10 @@ export function PostItem({ post }) {
 
   return (
     <Animated.View style={[styles.card, { opacity: fadeIn }]}>
-      <Text style={styles.username}>@{profile?.username || 'usuario'}</Text>
-      {post.createdAt && <Text style={styles.time}>{moment(post.createdAt).fromNow()}</Text>}
+      <Text style={styles.username}>@{post.username || username || 'usuario'}</Text>
+      {post.createdAt && (
+        <Text style={styles.time}>{moment(post.createdAt).fromNow()}</Text>
+      )}
       {post.imageUrl && <Image source={{ uri: post.imageUrl }} style={styles.image} />}
       <Text style={styles.text}>{post.text}</Text>
       <View style={styles.actions}>
@@ -150,7 +163,6 @@ export function PostItem({ post }) {
     </Animated.View>
   );
 }
-
 const styles = StyleSheet.create({
   postHomeContainer: {
     backgroundColor: colors.FONDO_CARDS,
@@ -209,7 +221,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: colors.GRIS_INTERMEDIO,
     paddingVertical: 12,
-    paddingHorizontal: 0,
     marginVertical: 0,
     marginHorizontal: 0,
   },

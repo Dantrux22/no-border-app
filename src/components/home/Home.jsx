@@ -1,3 +1,4 @@
+// src/components/home/Home.jsx
 import React, { useState, useContext } from 'react';
 import {
   SafeAreaView,
@@ -6,7 +7,6 @@ import {
   View,
   Alert,
   TouchableOpacity,
-  Text,
 } from 'react-native';
 import Header from '../Header';
 import { colors } from '../global/colors';
@@ -15,14 +15,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { auth } from '../firebaseConfig';
 import { signOut } from 'firebase/auth';
 import { useNavigation } from '@react-navigation/native';
-import { AuthContext } from '../auth/AuthProvider'; // ✅ para acceder al perfil
+import { AuthContext } from '../auth/AuthProvider';
 
 export default function Home() {
   const [posts, setPosts] = useState([]);
   const navigation = useNavigation();
-  const { profile } = useContext(AuthContext);
+  const { profile } = useContext(AuthContext); // Agregamos el perfil
 
-  const handleAdd = newPost => {
+  const handleAdd = (newPost) => {
     setPosts([newPost, ...posts]);
   };
 
@@ -31,15 +31,12 @@ export default function Home() {
       'Cerrar sesión',
       '¿Estás seguro de que querés cerrar sesión?',
       [
-        {
-          text: 'Cancelar',
-          style: 'cancel',
-        },
+        { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Sí, salir',
           onPress: async () => {
             await signOut(auth);
-            navigation.replace('Auth');
+            navigation.replace('Login');
           },
           style: 'destructive',
         },
@@ -50,22 +47,19 @@ export default function Home() {
   return (
     <SafeAreaView style={styles.container}>
       <Header title="No Border" />
-
       <TouchableOpacity onPress={handleLogout} style={styles.logoutIcon}>
         <Ionicons name="log-out-outline" size={24} color={colors.BLANCO} />
       </TouchableOpacity>
 
-      {profile?.username && (
-        <View style={styles.greetingContainer}>
-          <Text style={styles.greetingText}>Hola, {profile.username} 👋</Text>
-        </View>
-      )}
+      <PostComponent
+        onAdd={handleAdd}
+        username={profile?.username || 'usuario'} // ✅ Le pasamos el nombre
+      />
 
-      <PostComponent onAdd={handleAdd} />
       <FlatList
         data={posts}
-        keyExtractor={item => item.id}
-        renderItem={({ item }) => <PostItem post={item} />}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => <PostItem post={item} username={profile?.username || 'usuario'} />}
         contentContainerStyle={styles.feed}
       />
     </SafeAreaView>
@@ -89,13 +83,5 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 20,
     elevation: 4,
-  },
-  greetingContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-  },
-  greetingText: {
-    fontSize: 18,
-    color: colors.TEXTO_PRINCIPAL,
   },
 });
