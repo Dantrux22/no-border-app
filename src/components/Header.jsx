@@ -1,4 +1,3 @@
-import React from 'react';
 import { StyleSheet, Text, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from './global/colors';

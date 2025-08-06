@@ -1,6 +1,7 @@
 // src/components/auth/LoginScreen.jsx
 
 import React, { useState } from 'react';
+import { useNavigation } from '@react-navigation/native';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -11,15 +12,14 @@ import {
   StyleSheet,
   Alert,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebaseConfig';
 import { colors } from '../global/colors';
 
 export default function LoginScreen() {
+  const navigation = useNavigation();
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  const navigation = useNavigation();
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
@@ -28,8 +28,8 @@ export default function LoginScreen() {
     try {
       await signInWithEmailAndPassword(auth, email.trim(), password);
       navigation.replace('Home');
-    } catch (error) {
-      Alert.alert('Error al iniciar sesión', error.message);
+    } catch (err) {
+      Alert.alert('Error al iniciar sesión', err.message);
     }
   };
 
@@ -38,7 +38,7 @@ export default function LoginScreen() {
       style={styles.keyboard}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.innerContainer}>
+      <View style={styles.inner}>
         <Text style={styles.header}>Iniciar sesión en No Border</Text>
 
         <TextInput
@@ -76,57 +76,20 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  keyboard: {
-    flex: 1,
-    backgroundColor: colors.FONDO,
+  keyboard: { flex: 1, backgroundColor: colors.FONDO },
+  inner:    { flex: 1, justifyContent: 'center', padding: 20 },
+  header:   { fontSize: 24, color: colors.TEXTO_PRINCIPAL, fontWeight: 'bold', marginBottom: 24, textAlign: 'center' },
+  input:    {
+    width: '100%', height: 50,
+    borderColor: colors.TEXTO_SECUNDARIO, borderWidth: 1, borderRadius: 8,
+    paddingHorizontal: 12, marginBottom: 16, color: colors.TEXTO_PRINCIPAL,
   },
-  innerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'stretch',
-    paddingHorizontal: 20,
+  button:   {
+    width: '100%', backgroundColor: colors.PRIMARIO, height: 50,
+    borderRadius: 25, justifyContent: 'center', alignItems: 'center', marginBottom: 16,
   },
-  header: {
-    fontSize: 24,
-    color: colors.TEXTO_PRINCIPAL,
-    fontWeight: 'bold',
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  input: {
-    width: '100%',
-    height: 50,
-    borderColor: colors.TEXTO_SECUNDARIO,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    marginBottom: 16,
-    color: colors.TEXTO_PRINCIPAL,
-  },
-  button: {
-    width: '100%',
-    backgroundColor: colors.PRIMARIO,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginVertical: 16,
-  },
-  buttonText: {
-    color: colors.BLANCO,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 8,
-  },
-  footerText: {
-    color: colors.TEXTO_SECUNDARIO,
-  },
-  link: {
-    color: colors.PRIMARIO,
-    fontWeight: 'bold',
-  },
+  buttonText: { color: colors.BLANCO, fontSize: 16, fontWeight: 'bold' },
+  footer:     { flexDirection: 'row', justifyContent: 'center' },
+  footerText: { color: colors.TEXTO_SECUNDARIO },
+  link:       { color: colors.PRIMARIO, fontWeight: 'bold', marginLeft: 4 },
 });

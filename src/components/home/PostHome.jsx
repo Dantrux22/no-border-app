@@ -1,122 +1,147 @@
+// src/components/home/PostHome.jsx
 import React, { useState } from 'react';
 import {
   View,
   TextInput,
-  StyleSheet,
-  Button,
-  Image,
   TouchableOpacity,
-  Alert,
-  ScrollView,
-  KeyboardAvoidingView,
+  Text,
+  Image,
+  StyleSheet,
   Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../global/colors';
 
-const PostHome = ({ onPost }) => {
+export default function PostHome({ onAdd }) {
   const [text, setText] = useState('');
-  const [image, setImage] = useState(null);
+  const [imageUri, setImageUri] = useState(null);
 
   const pickImage = async () => {
+    if (Platform.OS !== 'web') {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        alert('Se necesitan permisos de galería.');
+        return;
+      }
+    }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
       quality: 0.7,
     });
-
-    if (!result.canceled && result.assets?.length > 0) {
-      setImage(result.assets[0].uri);
-    }
+    if (!result.cancelled) setImageUri(result.uri);
   };
 
-  const handleSubmit = () => {
-    if (!text.trim() && !image) {
-      Alert.alert('Publicación vacía', 'Escribí algo o subí una imagen.');
-      return;
-    }
-
-    onPost({ text, image });
+  const handleAdd = () => {
+    if (!text.trim() && !imageUri) return;
+    onAdd({ id: Date.now().toString(), text: text.trim(), imageUrl: imageUri });
     setText('');
-    setImage(null);
+    setImageUri(null);
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.container}
-    >
-      <ScrollView
-        style={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-      >
-        <TextInput
-          style={styles.input}
-          placeholder="¿En qué estás pensando?"
-          placeholderTextColor={colors.TEXTO_SECUNDARIO}
-          multiline
-          scrollEnabled
-          value={text}
-          onChangeText={setText}
-        />
-
-        {image && (
-          <Image source={{ uri: image }} style={styles.previewImage} />
-        )}
-
-        <View style={styles.buttonsContainer}>
-          <TouchableOpacity style={styles.button} onPress={pickImage}>
-            <Button title="Subir imagen" color={colors.PRIMARIO} onPress={pickImage} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-            <Button title="Publicar" color={colors.PRIMARIO} onPress={handleSubmit} />
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    <View style={styles.postHomeContainer}>
+      <TextInput
+        style={styles.input}
+        placeholder="¿Qué estás pensando?"
+        placeholderTextColor={colors.TEXTO_SECUNDARIO}
+        value={text}
+        onChangeText={setText}
+        multiline
+      />
+      {imageUri && <Image source={{ uri: imageUri }} style={styles.preview} />}
+      <View style={styles.buttonRow}>
+        <TouchableOpacity onPress={pickImage} style={[styles.button, styles.imageButton]}>
+          <Text style={styles.buttonText}>📷 Foto</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={handleAdd} style={[styles.button, styles.postButton]}>
+          <Text style={styles.buttonText}>🚀 Publicar</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
-};
+}
 
-export default PostHome;
+export function PostItem({ post }) {
+  return (
+    <View style={styles.card}>
+      {post.imageUrl && <Image source={{ uri: post.imageUrl }} style={styles.image} />}
+      <Text style={styles.username}>Yo</Text>
+      <Text style={styles.text}>{post.text}</Text>
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
-  container: {
+  postHomeContainer: {
     backgroundColor: colors.FONDO_CARDS,
-    padding: 12,
+    marginHorizontal: 16,
+    marginVertical: 8,
     borderRadius: 12,
-    margin: 16,
-    shadowColor: colors.SOMBRA,
-    shadowOpacity: 0.2,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2,
-  },
-  scroll: {
-    maxHeight: 250,
+    elevation: 3,
   },
   input: {
+    minHeight: 60,
+    borderColor: colors.TEXTO_SECUNDARIO,
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
     color: colors.TEXTO_PRINCIPAL,
-    borderBottomWidth: 1,
-    borderColor: colors.GRIS_INTERMEDIO,
-    paddingVertical: 10,
-    paddingHorizontal: 6,
-    minHeight: 80,
-    maxHeight: 200,
+    backgroundColor: colors.FONDO,
+    marginBottom: 8,
     textAlignVertical: 'top',
-    marginBottom: 12,
   },
-  previewImage: {
+  preview: {
     width: '100%',
     height: 180,
-    borderRadius: 10,
-    marginBottom: 10,
+    borderRadius: 8,
+    marginBottom: 8,
   },
-  buttonsContainer: {
+  buttonRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   button: {
     flex: 1,
-    marginHorizontal: 5,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  imageButton: {
+    backgroundColor: colors.SECUNDARIO,
+    marginRight: 8,
+  },
+  postButton: {
+    backgroundColor: colors.PRIMARIO,
+  },
+  buttonText: {
+    color: colors.BLANCO,
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  card: {
+    backgroundColor: colors.FONDO_CARDS,
+    borderRadius: 8,
+    padding: 12,
+    marginVertical: 8,
+    marginHorizontal: 16,
+  },
+  image: {
+    width: '100%',
+    height: 150,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  username: {
+    fontWeight: 'bold',
+    color: colors.SECUNDARIO,
+    marginBottom: 4,
+  },
+  text: {
+    color: colors.TEXTO_PRINCIPAL,
   },
 });

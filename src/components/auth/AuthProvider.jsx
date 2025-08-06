@@ -1,27 +1,40 @@
 // src/components/auth/AuthProvider.jsx
+
 import React, { createContext, useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from '../firebaseConfig';
+import { auth, db } from '../firebaseConfig';
+import { doc, getDoc } from 'firebase/firestore';
 
-export const AuthContext = createContext({ user: null, setUser: () => {} });
+export const AuthContext = createContext({
+  user: null,
+  profile: null,
+  setProfile: () => {},
+});
 
 export default function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, u => {
-      setUser(u);
+    const unsub = onAuthStateChanged(auth, async (fbUser) => {
+      setUser(fbUser);
+      if (fbUser) {
+        const snap = await getDoc(doc(db, 'users', fbUser.uid));
+        setProfile(snap.exists() ? snap.data() : null);
+      } else {
+        setProfile(null);
+      }
       if (initializing) setInitializing(false);
     });
-    return unsubscribe;
+    return unsub;
   }, [initializing]);
 
-  if (initializing) return null; 
+  if (initializing) return null;
+
   return (
-    <AuthContext.Provider value={{ user, setUser }}>
+    <AuthContext.Provider value={{ user, profile, setProfile }}>
       {children}
     </AuthContext.Provider>
   );
 }
-
