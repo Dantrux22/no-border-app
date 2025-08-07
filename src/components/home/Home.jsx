@@ -20,10 +20,10 @@ import { signOut } from 'firebase/auth';
 import { fetchUser, fetchPosts } from '../db/localStore';
 
 export default function Home() {
-  const [posts, setPosts]       = useState([]);
+  const [posts, setPosts] = useState([]);
   const [username, setUsername] = useState('usuario');
-  const [loading, setLoading]   = useState(true);
-  const navigation               = useNavigation();
+  const [loading, setLoading] = useState(true);
+  const navigation = useNavigation();
 
   const topPadding = Platform.OS === 'android' ? RNStatusBar.currentHeight : 0;
 
