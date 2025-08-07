@@ -1,16 +1,15 @@
 // src/components/firebaseConfig.js
-
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
   initializeAuth,
-  getAuth,
   getReactNativePersistence,
 } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   initializeFirestore,
   getFirestore,
-  setLogLevel,
+  enableIndexedDbPersistence,
+  enableNetwork,
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
@@ -27,35 +26,33 @@ const firebaseConfig = {
 // ⚡ Inicializamos app (solo una vez)
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// 🔑 Auth con AsyncStorage
-let auth;
-try {
-  auth = getAuth(app);
-} catch (error) {
-  auth = initializeAuth(app, {
-    persistence: getReactNativePersistence(AsyncStorage),
-  });
-}
+// 🔑 Auth con AsyncStorage para persistencia de sesión
+const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(AsyncStorage),
+});
 
-// 🔥 Firestore con long polling (solo una vez)
-let db;
-if (!global._firestoreInitialized) {
-  db = initializeFirestore(app, {
-    experimentalForceLongPolling: true,
-    useFetchStreams: false,
-  });
-  global._firestoreInitialized = true;
-} else {
-  db = getFirestore(app);
+// 🔥 Firestore con configuración
+const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+  useFetchStreams: false,
+});
+
+// ✅ (Opcional) Activar persistencia offline en Firestore
+// enableIndexedDbPersistence(db).catch((err) => {
+//   console.warn('No se pudo activar persistencia offline:', err.code);
+// });
+
+// ✅ Forzar conexión en operaciones críticas
+export async function ensureFirestoreOnline() {
+  try {
+    await enableNetwork(db);
+    console.log('✅ Firestore network enabled.');
+  } catch (err) {
+    console.warn('⚠️ No se pudo habilitar network en Firestore:', err);
+  }
 }
 
 // ☁️ Storage
 const storage = getStorage(app);
 
-// 🔇 Silenciar logs de Firestore (opcional)
-try {
-  setLogLevel('silent');
-} catch {}
-
-// ✅ Exportar instancias
 export { auth, db, storage };

@@ -1,3 +1,5 @@
+// src/components/auth/AuthScreen.jsx
+
 import React, { useState, useContext, useEffect } from 'react';
 import {
   KeyboardAvoidingView,
@@ -16,9 +18,11 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from 'firebase/auth';
+// Import correcto desde components/firebaseConfig.js
 import { auth, db } from '../firebaseConfig';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { AuthContext } from './AuthProvider'; // ✅ ruta corregida
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { saveUser, fetchUser } from '../db/localStore';
+import { AuthContext } from './AuthProvider';
 import { colors } from '../global/colors';
 import { useNavigation } from '@react-navigation/native';
 
@@ -27,72 +31,91 @@ export default function AuthScreen() {
   const navigation = useNavigation();
 
   const [isRegister, setIsRegister] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPass] = useState('');
-  const [username, setUsernm] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [email, setEmail]       = useState('');
+  const [password, setPass]     = useState('');
+  const [username, setUsernm]   = useState('');
+  const [loading, setLoading]   = useState(false);
 
   useEffect(() => {
-    if (user) {
-      navigation.replace('Home');
-    }
+    if (user) navigation.replace('Home');
   }, [user]);
 
+  // Login con fallback local-first
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Completa todos los campos');
-      return;
+      return Alert.alert('Completa todos los campos');
     }
+    setLoading(true);
     try {
-      setLoading(true);
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (error) {
-      console.log('❌ Error al iniciar sesión:', error.message);
-      Alert.alert('Error', error.message);
+      const userCred = await signInWithEmailAndPassword(auth, email.trim(), password);
+      const { uid } = userCred.user;
+
+      // Intentar perfil local
+      const localProfile = await fetchUser(uid);
+      if (localProfile) {
+        console.log('✅ Perfil local encontrado:', localProfile);
+        return;
+      }
+
+      // Si no hay local, intentar Firestore
+      try {
+        const snap = await getDoc(doc(db, 'users', uid));
+        if (snap.exists()) {
+          const data = snap.data();
+          const profile = { uid, username: data.username, email: data.email };
+          await saveUser(profile);
+          console.log('📄 Perfil descargado y guardado localmente:', profile);
+        }
+      } catch (e) {
+        console.log('⚠️ No se pudo descargar perfil de Firestore:', e.message);
+      }
+    } catch (err) {
+      console.log('❌ Error al iniciar sesión:', err.message);
+      Alert.alert('Error', err.message);
     } finally {
       setLoading(false);
     }
   };
 
+  // Registro y guardado local
   const handleRegister = async () => {
     if (!email || !password || !username) {
-      Alert.alert('Completa todos los campos');
-      return;
+      return Alert.alert('Completa todos los campos');
     }
+    setLoading(true);
     try {
-      setLoading(true);
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const { uid } = userCredential.user;
+      const userCred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      const { uid } = userCred.user;
 
-      const profile = {
-        email,
-        username,
+      const profile = { uid, username: username.trim(), email: email.trim() };
+
+      // Guardar en Firestore
+      await setDoc(doc(db, 'users', uid), {
+        ...profile,
         createdAt: serverTimestamp(),
-      };
+      });
 
-      await setDoc(doc(db, 'users', uid), profile);
-      await signOut(auth); // Desloguear después de registrar
+      // Guardar localmente
+      await saveUser(profile);
+
+      // Desloguear
+      await signOut(auth);
 
       Alert.alert(
         'Cuenta creada',
-        'Tu cuenta fue creada correctamente 🎉',
+        '¡Tu cuenta fue creada correctamente! Ahora iniciá sesión.',
         [{ text: 'OK', onPress: () => setIsRegister(false) }],
         { cancelable: false }
       );
-    } catch (error) {
-      console.log('❌ Error al registrarse:', error.message);
-      if (error.code === 'auth/email-already-in-use') {
-        Alert.alert('Correo en uso', 'Ya existe una cuenta con ese correo electrónico.');
-      } else {
-        Alert.alert('Error al registrarse', error.message);
-      }
+    } catch (err) {
+      console.log('❌ Error al registrarse:', err.message);
+      const msg = err.code === 'auth/email-already-in-use'
+        ? 'Ya existe una cuenta con ese email.'
+        : err.message;
+      Alert.alert('Error al registrarse', msg);
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleSubmit = () => {
-    isRegister ? handleRegister() : handleLogin();
   };
 
   return (
@@ -101,17 +124,17 @@ export default function AuthScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <StatusBar barStyle="light-content" backgroundColor={colors.FONDO} />
-
-      <Text style={styles.title}>{isRegister ? 'Crear cuenta' : 'Iniciar sesión'}</Text>
-
+      <Text style={styles.title}>
+        {isRegister ? 'Crear cuenta' : 'Iniciar sesión'}
+      </Text>
       <TextInput
         style={styles.input}
         placeholder="Correo electrónico"
         placeholderTextColor={colors.TEXTO_SECUNDARIO}
-        value={email}
-        onChangeText={setEmail}
         keyboardType="email-address"
         autoCapitalize="none"
+        value={email}
+        onChangeText={setEmail}
       />
       <TextInput
         style={styles.input}
@@ -130,17 +153,18 @@ export default function AuthScreen() {
           onChangeText={setUsernm}
         />
       )}
-
-      <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={loading}>
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>
-            {isRegister ? 'Crear cuenta' : 'Ingresar'}
-          </Text>
-        )}
+      <TouchableOpacity
+        style={styles.button}
+        onPress={isRegister ? handleRegister : handleLogin}
+        disabled={loading}
+      >
+        {loading
+          ? <ActivityIndicator color="#fff" />
+          : <Text style={styles.buttonText}>
+              {isRegister ? 'Crear cuenta' : 'Ingresar'}
+            </Text>
+        }
       </TouchableOpacity>
-
       <TouchableOpacity onPress={() => setIsRegister(!isRegister)}>
         <Text style={styles.toggleText}>
           {isRegister
