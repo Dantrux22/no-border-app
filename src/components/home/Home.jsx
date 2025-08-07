@@ -1,6 +1,5 @@
 // src/components/home/Home.jsx
-
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   SafeAreaView,
   FlatList,
@@ -9,6 +8,8 @@ import {
   Alert,
   TouchableOpacity,
   ActivityIndicator,
+  Platform,
+  StatusBar as RNStatusBar,
 } from 'react-native';
 import Header from '../Header';
 import { colors } from '../global/colors';
@@ -18,36 +19,35 @@ import { auth } from '../firebaseConfig';
 import { signOut } from 'firebase/auth';
 import { useNavigation } from '@react-navigation/native';
 import { fetchUser, fetchPosts } from '../db/localStore';
-import { AuthContext } from '../auth/AuthProvider';
 
 export default function Home() {
-  const [posts, setPosts] = useState([]);
+  const [posts, setPosts]       = useState([]);
   const [username, setUsername] = useState('usuario');
-  const [loading, setLoading] = useState(true);
-  const navigation = useNavigation();
-  const { user } = useContext(AuthContext);
+  const [loading, setLoading]   = useState(true);
+  const navigation               = useNavigation();
+
+  // Para que el StatusBar en Android no tape tu header
+  const topPadding = Platform.OS === 'android' ? RNStatusBar.currentHeight : 0;
 
   useEffect(() => {
-    if (user) {
-      // Cargar perfil y posts locales
-      Promise.all([
-        fetchUser(user.uid).then(profile => {
-          if (profile && profile.username) {
-            setUsername(profile.username);
-          }
-        }),
-        fetchPosts().then(fetched => {
-          setPosts(fetched);
-        }),
-      ]).finally(() => {
-        setLoading(false);
-      });
+    const uid = auth.currentUser?.uid;
+    if (!uid) {
+      setLoading(false);
+      return;
     }
-  }, [user]);
+
+    Promise.all([
+      fetchUser(uid).then(profile => {
+        if (profile?.username) setUsername(profile.username);
+      }),
+      fetchPosts().then(fetched => {
+        setPosts(fetched);
+      }),
+    ]).finally(() => setLoading(false));
+  }, []);
 
   const handleAdd = newPost => {
-    // Aquí ya tu PostComponent guarda en local y en Firestore
-    setPosts([newPost, ...posts]);
+    setPosts(prev => [newPost, ...prev]);
   };
 
   const handleLogout = () => {
@@ -62,9 +62,10 @@ export default function Home() {
           onPress: async () => {
             try {
               await signOut(auth);
-              // AuthProvider detectará user=null y RootNavigator volverá a Auth
+              navigation.reset({ index: 0, routes: [{ name: 'Auth' }] });
             } catch (error) {
               console.error('Error al cerrar sesión:', error);
+              Alert.alert('Error', 'No se pudo cerrar sesión');
             }
           },
         },
@@ -81,7 +82,7 @@ export default function Home() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { paddingTop: topPadding }]}>
       <Header title={`Hola, ${username}`} />
       <TouchableOpacity onPress={handleLogout} style={styles.logoutIcon}>
         <Ionicons name="log-out-outline" size={24} color={colors.BLANCO} />
@@ -92,10 +93,9 @@ export default function Home() {
       <FlatList
         data={posts}
         keyExtractor={item => item.id}
-        renderItem={({ item }) => (
-          <PostItem post={item} username={username} />
-        )}
+        renderItem={({ item }) => <PostItem post={item} username={username} />}
         contentContainerStyle={styles.feed}
+        showsVerticalScrollIndicator={false}
       />
     </SafeAreaView>
   );
@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
   },
   logoutIcon: {
     position: 'absolute',
-    top: 40,
+    top: Platform.OS === 'android' ? RNStatusBar.currentHeight + 12 : 40,
     right: 20,
     zIndex: 1,
     backgroundColor: colors.FONDO_CARDS,

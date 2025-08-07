@@ -1,118 +1,81 @@
 // src/components/auth/AuthScreen.jsx
-
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
-  KeyboardAvoidingView,
-  Platform,
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  Alert,
   ActivityIndicator,
+  Alert,
+  StyleSheet,
   StatusBar,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { auth } from '../firebaseConfig';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  signOut,
 } from 'firebase/auth';
-// Import correcto desde components/firebaseConfig.js
-import { auth, db } from '../firebaseConfig';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
-import { saveUser, fetchUser } from '../db/localStore';
-import { AuthContext } from './AuthProvider';
 import { colors } from '../global/colors';
-import { useNavigation } from '@react-navigation/native';
 
 export default function AuthScreen() {
-  const { user } = useContext(AuthContext);
   const navigation = useNavigation();
+  const [isRegistering, setIsRegistering] = useState(false);
 
-  const [isRegister, setIsRegister] = useState(false);
-  const [email, setEmail]       = useState('');
-  const [password, setPass]     = useState('');
-  const [username, setUsernm]   = useState('');
-  const [loading, setLoading]   = useState(false);
+  // Login fields
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPass, setLoginPass]   = useState('');
 
-  useEffect(() => {
-    if (user) navigation.replace('Home');
-  }, [user]);
+  // Register fields
+  const [regEmail, setRegEmail]     = useState('');
+  const [regPass, setRegPass]       = useState('');
+  const [username, setUsername]     = useState('');
 
-  // Login con fallback local-first
+  const [loading, setLoading] = useState(false);
+
+  const switchToLogin = () => {
+    setIsRegistering(false);
+    setRegEmail('');
+    setRegPass('');
+    setUsername('');
+  };
+  const switchToRegister = () => {
+    setIsRegistering(true);
+    setLoginEmail('');
+    setLoginPass('');
+  };
+
   const handleLogin = async () => {
-    if (!email || !password) {
-      return Alert.alert('Completa todos los campos');
-    }
     setLoading(true);
     try {
-      const userCred = await signInWithEmailAndPassword(auth, email.trim(), password);
-      const { uid } = userCred.user;
-
-      // Intentar perfil local
-      const localProfile = await fetchUser(uid);
-      if (localProfile) {
-        console.log('✅ Perfil local encontrado:', localProfile);
-        return;
-      }
-
-      // Si no hay local, intentar Firestore
-      try {
-        const snap = await getDoc(doc(db, 'users', uid));
-        if (snap.exists()) {
-          const data = snap.data();
-          const profile = { uid, username: data.username, email: data.email };
-          await saveUser(profile);
-          console.log('📄 Perfil descargado y guardado localmente:', profile);
-        }
-      } catch (e) {
-        console.log('⚠️ No se pudo descargar perfil de Firestore:', e.message);
-      }
-    } catch (err) {
-      console.log('❌ Error al iniciar sesión:', err.message);
-      Alert.alert('Error', err.message);
+      await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPass);
+      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+    } catch (e) {
+      Alert.alert('Error al iniciar sesión', e.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // Registro y guardado local
   const handleRegister = async () => {
-    if (!email || !password || !username) {
-      return Alert.alert('Completa todos los campos');
+    if (!username.trim()) {
+      return Alert.alert('Error', 'Por favor ingresa un nombre de usuario');
     }
     setLoading(true);
     try {
-      const userCred = await createUserWithEmailAndPassword(auth, email.trim(), password);
-      const { uid } = userCred.user;
-
-      const profile = { uid, username: username.trim(), email: email.trim() };
-
-      // Guardar en Firestore
-      await setDoc(doc(db, 'users', uid), {
-        ...profile,
-        createdAt: serverTimestamp(),
-      });
-
-      // Guardar localmente
-      await saveUser(profile);
-
-      // Desloguear
-      await signOut(auth);
-
-      Alert.alert(
-        'Cuenta creada',
-        '¡Tu cuenta fue creada correctamente! Ahora iniciá sesión.',
-        [{ text: 'OK', onPress: () => setIsRegister(false) }],
-        { cancelable: false }
+      const cred = await createUserWithEmailAndPassword(
+        auth,
+        regEmail.trim(),
+        regPass
       );
-    } catch (err) {
-      console.log('❌ Error al registrarse:', err.message);
-      const msg = err.code === 'auth/email-already-in-use'
-        ? 'Ya existe una cuenta con ese email.'
-        : err.message;
-      Alert.alert('Error al registrarse', msg);
+      // Puedes guardar el username en Firestore aquí, si lo tienes configurado
+      // const { uid } = cred.user;
+      // await setDoc(doc(db, 'users', uid), { username, email: regEmail.trim(), createdAt: new Date() });
+      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+    } catch (e) {
+      Alert.alert('Error al registrar', e.message);
     } finally {
       setLoading(false);
     }
@@ -120,100 +83,109 @@ export default function AuthScreen() {
 
   return (
     <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <StatusBar barStyle="light-content" backgroundColor={colors.FONDO} />
-      <Text style={styles.title}>
-        {isRegister ? 'Crear cuenta' : 'Iniciar sesión'}
-      </Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Correo electrónico"
-        placeholderTextColor={colors.TEXTO_SECUNDARIO}
-        keyboardType="email-address"
-        autoCapitalize="none"
-        value={email}
-        onChangeText={setEmail}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Contraseña"
-        placeholderTextColor={colors.TEXTO_SECUNDARIO}
-        secureTextEntry
-        value={password}
-        onChangeText={setPass}
-      />
-      {isRegister && (
-        <TextInput
-          style={styles.input}
-          placeholder="Nombre de usuario"
-          placeholderTextColor={colors.TEXTO_SECUNDARIO}
-          value={username}
-          onChangeText={setUsernm}
-        />
-      )}
-      <TouchableOpacity
-        style={styles.button}
-        onPress={isRegister ? handleRegister : handleLogin}
-        disabled={loading}
-      >
-        {loading
-          ? <ActivityIndicator color="#fff" />
-          : <Text style={styles.buttonText}>
-              {isRegister ? 'Crear cuenta' : 'Ingresar'}
+
+      <View style={styles.toggleContainer}>
+        <TouchableOpacity
+          onPress={switchToLogin}
+          style={[styles.toggleButton, !isRegistering && styles.activeToggle]}
+        >
+          <Text style={styles.toggleText}>Login</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={switchToRegister}
+          style={[styles.toggleButton, isRegistering && styles.activeToggle]}
+        >
+          <Text style={styles.toggleText}>Registro</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.formContainer}>
+        {isRegistering ? (
+          <>
+            <TextInput
+              style={styles.input}
+              placeholder="Nombre de usuario"
+              placeholderTextColor={colors.TEXTO_SECUNDARIO}
+              value={username}
+              onChangeText={setUsername}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor={colors.TEXTO_SECUNDARIO}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              value={regEmail}
+              onChangeText={setRegEmail}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Contraseña"
+              placeholderTextColor={colors.TEXTO_SECUNDARIO}
+              secureTextEntry
+              value={regPass}
+              onChangeText={setRegPass}
+            />
+          </>
+        ) : (
+          <>
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor={colors.TEXTO_SECUNDARIO}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              value={loginEmail}
+              onChangeText={setLoginEmail}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Contraseña"
+              placeholderTextColor={colors.TEXTO_SECUNDARIO}
+              secureTextEntry
+              value={loginPass}
+              onChangeText={setLoginPass}
+            />
+          </>
+        )}
+
+        {loading ? (
+          <ActivityIndicator size="large" color={colors.PRIMARIO} />
+        ) : (
+          <TouchableOpacity
+            style={styles.button}
+            onPress={isRegistering ? handleRegister : handleLogin}
+          >
+            <Text style={styles.buttonText}>
+              {isRegistering ? 'Crear cuenta' : 'Iniciar sesión'}
             </Text>
-        }
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => setIsRegister(!isRegister)}>
-        <Text style={styles.toggleText}>
-          {isRegister
-            ? '¿Ya tenés cuenta? Iniciá sesión'
-            : '¿No tenés cuenta? Registrate'}
-        </Text>
-      </TouchableOpacity>
+          </TouchableOpacity>
+        )}
+      </View>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.FONDO,
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-  },
-  title: {
-    fontSize: 24,
-    color: colors.TEXTO_PRINCIPAL,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  input: {
-    height: 50,
-    backgroundColor: colors.FONDO_CARDS,
+  container:       { flex: 1, backgroundColor: colors.FONDO, justifyContent: 'center', padding: 16 },
+  toggleContainer: { flexDirection: 'row', marginBottom: 24 },
+  toggleButton:    { flex: 1, paddingVertical: 12, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  activeToggle:    { borderBottomColor: colors.PRIMARIO },
+  toggleText:      { textAlign: 'center', color: colors.BLANCO, fontWeight: 'bold', fontSize: 16 },
+  formContainer:   { width: '100%' },
+  input:           {
+    height: 48,
     borderColor: colors.GRIS_INTERMEDIO,
     borderWidth: 1,
     borderRadius: 8,
-    marginBottom: 12,
+    marginBottom: 16,
     paddingHorizontal: 12,
     color: colors.TEXTO_PRINCIPAL,
   },
-  button: {
-    backgroundColor: colors.PRIMARIO,
-    padding: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  buttonText: {
-    color: colors.BLANCO,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  toggleText: {
-    color: colors.TEXTO_SECUNDARIO,
-    textAlign: 'center',
-    marginTop: 10,
-  },
+  button:          { height: 48, backgroundColor: colors.PRIMARIO, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  buttonText:      { color: colors.BLANCO, fontWeight: 'bold', fontSize: 16 },
 });
