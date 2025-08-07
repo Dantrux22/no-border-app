@@ -24,14 +24,14 @@ export default function AuthScreen() {
   const navigation = useNavigation();
   const [isRegistering, setIsRegistering] = useState(false);
 
-  // Login fields
+  // Login
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPass, setLoginPass]   = useState('');
 
-  // Register fields
-  const [regEmail, setRegEmail]     = useState('');
-  const [regPass, setRegPass]       = useState('');
-  const [username, setUsername]     = useState('');
+  // Registro
+  const [regEmail, setRegEmail]   = useState('');
+  const [regPass, setRegPass]     = useState('');
+  const [username, setUsername]   = useState('');
 
   const [loading, setLoading] = useState(false);
 
@@ -48,11 +48,21 @@ export default function AuthScreen() {
   };
 
   const handleLogin = async () => {
+    console.log('🔑 Intentando login:', loginEmail, loginPass);
+    if (!loginEmail.trim() || !loginPass) {
+      return Alert.alert('Error', 'Email y contraseña son obligatorios');
+    }
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPass);
+      const cred = await signInWithEmailAndPassword(
+        auth,
+        loginEmail.trim(),
+        loginPass
+      );
+      console.log('✅ Login correcto, UID:', cred.user.uid);
       navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
     } catch (e) {
+      console.log('❌ Error login:', e.code, e.message);
       Alert.alert('Error al iniciar sesión', e.message);
     } finally {
       setLoading(false);
@@ -60,8 +70,12 @@ export default function AuthScreen() {
   };
 
   const handleRegister = async () => {
+    console.log('📝 Intentando registro:', regEmail, username);
     if (!username.trim()) {
-      return Alert.alert('Error', 'Por favor ingresa un nombre de usuario');
+      return Alert.alert('Error', 'El nombre de usuario es obligatorio');
+    }
+    if (!regEmail.trim() || !regPass) {
+      return Alert.alert('Error', 'Email y contraseña son obligatorios');
     }
     setLoading(true);
     try {
@@ -70,11 +84,11 @@ export default function AuthScreen() {
         regEmail.trim(),
         regPass
       );
-      // Puedes guardar el username en Firestore aquí, si lo tienes configurado
-      // const { uid } = cred.user;
-      // await setDoc(doc(db, 'users', uid), { username, email: regEmail.trim(), createdAt: new Date() });
+      console.log('✅ Registro correcto, UID:', cred.user.uid);
+      // Aquí podrías guardar `username` en Firestore si lo necesitas
       navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
     } catch (e) {
+      console.log('❌ Error register:', e.code, e.message);
       Alert.alert('Error al registrar', e.message);
     } finally {
       setLoading(false);
@@ -83,8 +97,8 @@ export default function AuthScreen() {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <StatusBar barStyle="light-content" backgroundColor={colors.FONDO} />
 

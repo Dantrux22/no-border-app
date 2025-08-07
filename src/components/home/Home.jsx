@@ -11,13 +11,13 @@ import {
   Platform,
   StatusBar as RNStatusBar,
 } from 'react-native';
+import { CommonActions, useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import Header from '../Header';
 import { colors } from '../global/colors';
 import PostComponent, { PostItem } from './PostComponent';
-import { Ionicons } from '@expo/vector-icons';
 import { auth } from '../firebaseConfig';
 import { signOut } from 'firebase/auth';
-import { useNavigation } from '@react-navigation/native';
 import { fetchUser, fetchPosts } from '../db/localStore';
 
 export default function Home() {
@@ -26,7 +26,7 @@ export default function Home() {
   const [loading, setLoading]   = useState(true);
   const navigation               = useNavigation();
 
-  // Para que el StatusBar en Android no tape tu header
+  // Evita que el header tape la barra de notificaciones en Android
   const topPadding = Platform.OS === 'android' ? RNStatusBar.currentHeight : 0;
 
   useEffect(() => {
@@ -43,7 +43,9 @@ export default function Home() {
       fetchPosts().then(fetched => {
         setPosts(fetched);
       }),
-    ]).finally(() => setLoading(false));
+    ]).finally(() => {
+      setLoading(false);
+    });
   }, []);
 
   const handleAdd = newPost => {
@@ -62,7 +64,12 @@ export default function Home() {
           onPress: async () => {
             try {
               await signOut(auth);
-              navigation.reset({ index: 0, routes: [{ name: 'Auth' }] });
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [{ name: 'Auth' }],
+                })
+              );
             } catch (error) {
               console.error('Error al cerrar sesión:', error);
               Alert.alert('Error', 'No se pudo cerrar sesión');
@@ -83,7 +90,7 @@ export default function Home() {
 
   return (
     <SafeAreaView style={[styles.container, { paddingTop: topPadding }]}>
-      <Header title={`Hola, ${username}`} />
+      <Header title="No Border" />
       <TouchableOpacity onPress={handleLogout} style={styles.logoutIcon}>
         <Ionicons name="log-out-outline" size={24} color={colors.BLANCO} />
       </TouchableOpacity>
@@ -93,7 +100,9 @@ export default function Home() {
       <FlatList
         data={posts}
         keyExtractor={item => item.id}
-        renderItem={({ item }) => <PostItem post={item} username={username} />}
+        renderItem={({ item }) => (
+          <PostItem post={item} username={username} />
+        )}
         contentContainerStyle={styles.feed}
         showsVerticalScrollIndicator={false}
       />
@@ -119,7 +128,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: Platform.OS === 'android' ? RNStatusBar.currentHeight + 12 : 40,
     right: 20,
-    zIndex: 1,
+    zIndex: 10,
     backgroundColor: colors.FONDO_CARDS,
     padding: 8,
     borderRadius: 20,
