@@ -1,5 +1,4 @@
 
-// src/components/firebaseConfig.js
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { initializeFirestore } from 'firebase/firestore';
@@ -15,7 +14,6 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-// Firestore con long-polling forzado (RN)
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
   useFetchStreams: false,

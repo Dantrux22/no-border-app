@@ -1,4 +1,3 @@
-// src/components/home/Home.jsx
 import React, { useState, useEffect } from 'react';
 import {
   SafeAreaView,
@@ -26,7 +25,6 @@ export default function Home() {
   const [loading, setLoading]   = useState(true);
   const navigation               = useNavigation();
 
-  // Evita que el header tape la barra de notificaciones en Android
   const topPadding = Platform.OS === 'android' ? RNStatusBar.currentHeight : 0;
 
   useEffect(() => {

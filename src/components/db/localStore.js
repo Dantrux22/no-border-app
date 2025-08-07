@@ -1,10 +1,8 @@
-// src/components/db/localStore.js
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const POSTS_KEY = 'noborder_posts';
 const USER_KEY = uid => `noborder_user_${uid}`;
 
-// Guarda o actualiza un perfil de usuario
 export async function saveUser({ uid, username, email }) {
   try {
     await AsyncStorage.setItem(USER_KEY(uid), JSON.stringify({ uid, username, email }));
@@ -14,7 +12,6 @@ export async function saveUser({ uid, username, email }) {
   }
 }
 
-// Lee el perfil local
 export async function fetchUser(uid) {
   try {
     const s = await AsyncStorage.getItem(USER_KEY(uid));
@@ -25,7 +22,6 @@ export async function fetchUser(uid) {
   }
 }
 
-// Guarda o actualiza un post
 export async function savePost(post) {
   try {
     const all = await fetchPosts();

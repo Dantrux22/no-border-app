@@ -1,4 +1,3 @@
-// src/components/auth/AuthScreen.jsx
 import React, { useState } from 'react';
 import {
   View,
@@ -11,6 +10,7 @@ import {
   StatusBar,
   KeyboardAvoidingView,
   Platform,
+  ToastAndroid,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { auth } from '../firebaseConfig';
@@ -24,14 +24,12 @@ export default function AuthScreen() {
   const navigation = useNavigation();
   const [isRegistering, setIsRegistering] = useState(false);
 
-  // Login
   const [loginEmail, setLoginEmail] = useState('');
-  const [loginPass, setLoginPass]   = useState('');
+  const [loginPass, setLoginPass] = useState('');
 
-  // Registro
-  const [regEmail, setRegEmail]   = useState('');
-  const [regPass, setRegPass]     = useState('');
-  const [username, setUsername]   = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPass, setRegPass] = useState('');
+  const [username, setUsername] = useState('');
 
   const [loading, setLoading] = useState(false);
 
@@ -48,7 +46,6 @@ export default function AuthScreen() {
   };
 
   const handleLogin = async () => {
-    console.log('🔑 Intentando login:', loginEmail, loginPass);
     if (!loginEmail.trim() || !loginPass) {
       return Alert.alert('Error', 'Email y contraseña son obligatorios');
     }
@@ -59,10 +56,9 @@ export default function AuthScreen() {
         loginEmail.trim(),
         loginPass
       );
-      console.log('✅ Login correcto, UID:', cred.user.uid);
+      ToastAndroid.show('Login correcto ✅', ToastAndroid.SHORT);
       navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
     } catch (e) {
-      console.log('❌ Error login:', e.code, e.message);
       Alert.alert('Error al iniciar sesión', e.message);
     } finally {
       setLoading(false);
@@ -70,7 +66,6 @@ export default function AuthScreen() {
   };
 
   const handleRegister = async () => {
-    console.log('📝 Intentando registro:', regEmail, username);
     if (!username.trim()) {
       return Alert.alert('Error', 'El nombre de usuario es obligatorio');
     }
@@ -84,11 +79,9 @@ export default function AuthScreen() {
         regEmail.trim(),
         regPass
       );
-      console.log('✅ Registro correcto, UID:', cred.user.uid);
-      // Aquí podrías guardar `username` en Firestore si lo necesitas
+      ToastAndroid.show('Cuenta creada correctamente 🎉', ToastAndroid.SHORT);
       navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
     } catch (e) {
-      console.log('❌ Error register:', e.code, e.message);
       Alert.alert('Error al registrar', e.message);
     } finally {
       setLoading(false);
@@ -185,13 +178,35 @@ export default function AuthScreen() {
 }
 
 const styles = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: colors.FONDO, justifyContent: 'center', padding: 16 },
-  toggleContainer: { flexDirection: 'row', marginBottom: 24 },
-  toggleButton:    { flex: 1, paddingVertical: 12, borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  activeToggle:    { borderBottomColor: colors.PRIMARIO },
-  toggleText:      { textAlign: 'center', color: colors.BLANCO, fontWeight: 'bold', fontSize: 16 },
-  formContainer:   { width: '100%' },
-  input:           {
+  container: {
+    flex: 1,
+    backgroundColor: colors.FONDO,
+    justifyContent: 'center',
+    padding: 16,
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    marginBottom: 24,
+  },
+  toggleButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  activeToggle: {
+    borderBottomColor: colors.PRIMARIO,
+  },
+  toggleText: {
+    textAlign: 'center',
+    color: colors.BLANCO,
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  formContainer: {
+    width: '100%',
+  },
+  input: {
     height: 48,
     borderColor: colors.GRIS_INTERMEDIO,
     borderWidth: 1,
@@ -200,6 +215,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     color: colors.TEXTO_PRINCIPAL,
   },
-  button:          { height: 48, backgroundColor: colors.PRIMARIO, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
-  buttonText:      { color: colors.BLANCO, fontWeight: 'bold', fontSize: 16 },
+  button: {
+    height: 48,
+    backgroundColor: colors.PRIMARIO,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: colors.BLANCO,
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
 });

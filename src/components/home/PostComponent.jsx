@@ -13,9 +13,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../global/colors';
 import { Ionicons } from '@expo/vector-icons';
 import moment from 'moment';
-import 'moment/locale/es'; // ✅ Importa idioma español
+import 'moment/locale/es'; 
 
-moment.locale('es'); // ✅ Establece idioma español
+moment.locale('es');
 
 export default function PostComponent({ onAdd, disabled }) {
   const [text, setText] = useState('');
