@@ -13,12 +13,24 @@ import {
   ToastAndroid,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { auth } from '../firebaseConfig';
+import { auth, db } from '../firebaseConfig';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
 } from 'firebase/auth';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { colors } from '../global/colors';
+import { saveUserProfile, getUserProfile } from '../db/localStore';
+
+function withTimeout(promise, ms, onTimeout) {
+  let timer;
+  const timeout = new Promise((resolve) => {
+    timer = setTimeout(() => {
+      resolve(onTimeout());
+    }, ms);
+  });
+  return Promise.race([promise.finally(() => clearTimeout(timer)), timeout]);
+}
 
 export default function AuthScreen() {
   const navigation = useNavigation();
@@ -39,6 +51,7 @@ export default function AuthScreen() {
     setRegPass('');
     setUsername('');
   };
+
   const switchToRegister = () => {
     setIsRegistering(true);
     setLoginEmail('');
@@ -51,14 +64,29 @@ export default function AuthScreen() {
     }
     setLoading(true);
     try {
+      console.log('🔐 Login start');
       const cred = await signInWithEmailAndPassword(
         auth,
         loginEmail.trim(),
         loginPass
       );
+      const uid = cred.user.uid;
+      console.log('🔐 Logged in uid:', uid);
+
+      let profile = await getUserProfile(uid);
+      if (!profile) {
+        const ref = doc(db, 'users', uid);
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          profile = snap.data();
+          await saveUserProfile(uid, profile);
+        }
+      }
+
       ToastAndroid.show('Login correcto ✅', ToastAndroid.SHORT);
       navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
     } catch (e) {
+      console.log('❌ Login error:', e);
       Alert.alert('Error al iniciar sesión', e.message);
     } finally {
       setLoading(false);
@@ -74,14 +102,45 @@ export default function AuthScreen() {
     }
     setLoading(true);
     try {
+      console.log('🆕 Register start');
       const cred = await createUserWithEmailAndPassword(
         auth,
         regEmail.trim(),
         regPass
       );
+      const uid = cred.user.uid;
+      console.log('🆕 User created uid:', uid);
+
+      const profile = {
+        username: username.trim(),
+        email: regEmail.trim(),
+        createdAt: serverTimestamp(),
+      };
+
+      // Guardamos en cache primero, así Home ya tiene username aunque la red esté rara
+      await saveUserProfile(uid, { username: profile.username, email: profile.email });
+
+      // Intento de escritura a Firestore con timeout (5s)
+      const writeProfile = setDoc(doc(db, 'users', uid), profile, { merge: true });
+      await withTimeout(
+        writeProfile,
+        5000,
+        () => {
+          console.log('⚠️ setDoc timeout: navegamos igual y reintentamos en background');
+          return Promise.resolve('timeout');
+        }
+      ).catch((e) => {
+        console.log('❌ setDoc error:', e);
+        // No frenamos la navegación por este error
+      });
+
       ToastAndroid.show('Cuenta creada correctamente 🎉', ToastAndroid.SHORT);
       navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+
+      // Reintento en background (por si hubo timeout/transport error)
+      writeProfile.catch((e) => console.log('🔁 setDoc retry (background) err:', e));
     } catch (e) {
+      console.log('❌ Register error:', e);
       Alert.alert('Error al registrar', e.message);
     } finally {
       setLoading(false);

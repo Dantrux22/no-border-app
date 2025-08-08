@@ -1,4 +1,4 @@
-import React, { useState, useContext, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   TextInput,
@@ -13,11 +13,11 @@ import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../global/colors';
 import { Ionicons } from '@expo/vector-icons';
 import moment from 'moment';
-import 'moment/locale/es'; 
+import 'moment/locale/es';
 
 moment.locale('es');
 
-export default function PostComponent({ onAdd, disabled }) {
+export default function PostComponent({ onAdd, username, disabled }) {
   const [text, setText] = useState('');
   const [imageUri, setImageUri] = useState(null);
 
@@ -61,12 +61,7 @@ export default function PostComponent({ onAdd, disabled }) {
 
   const handleAdd = () => {
     if (!text.trim() && !imageUri) return;
-    onAdd({
-      id: Date.now().toString(),
-      text: text.trim(),
-      imageUrl: imageUri,
-      createdAt: new Date().toISOString(),
-    });
+    onAdd({ text: text.trim(), imageUrl: imageUri || null });
     setText('');
     setImageUri(null);
   };
@@ -131,12 +126,21 @@ export function PostItem({ post, username }) {
     setSaved(!saved);
   };
 
+  const createdDate = (() => {
+    const c = post?.createdAt;
+    if (!c) return null;
+    try {
+      if (c.toDate) return c.toDate();
+      return new Date(c);
+    } catch {
+      return null;
+    }
+  })();
+
   return (
     <Animated.View style={[styles.card, { opacity: fadeIn }]}>
-      <Text style={styles.username}>@{username || 'usuario'}</Text>
-      {post.createdAt && (
-        <Text style={styles.time}>{moment(post.createdAt).fromNow()}</Text>
-      )}
+      <Text style={styles.username}>@{post.username || username || 'usuario'}</Text>
+      {createdDate && <Text style={styles.time}>{moment(createdDate).fromNow()}</Text>}
       {post.imageUrl && <Image source={{ uri: post.imageUrl }} style={styles.image} />}
       <Text style={styles.text}>{post.text}</Text>
       <View style={styles.actions}>
@@ -169,10 +173,6 @@ const styles = StyleSheet.create({
     marginVertical: 8,
     borderRadius: 12,
     padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
     elevation: 3,
   },
   input: {

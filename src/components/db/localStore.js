@@ -1,46 +1,53 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebaseConfig';
 
-const POSTS_KEY = 'noborder_posts';
-const USER_KEY = uid => `noborder_user_${uid}`;
+const userKey = uid => `user:${uid}`;
+const postsKey = 'posts';
 
-export async function saveUser({ uid, username, email }) {
+export async function saveUserProfile(uid, profile) {
   try {
-    await AsyncStorage.setItem(USER_KEY(uid), JSON.stringify({ uid, username, email }));
-    console.log('✅ Perfil guardado localmente');
-  } catch (e) {
-    console.warn('⚠️ Error guardando perfil local:', e);
-  }
+    await AsyncStorage.setItem(userKey(uid), JSON.stringify(profile));
+  } catch {}
 }
 
-export async function fetchUser(uid) {
+export async function getUserProfile(uid) {
   try {
-    const s = await AsyncStorage.getItem(USER_KEY(uid));
-    return s ? JSON.parse(s) : null;
-  } catch (e) {
-    console.warn('⚠️ Error leyendo perfil local:', e);
+    const raw = await AsyncStorage.getItem(userKey(uid));
+    return raw ? JSON.parse(raw) : null;
+  } catch {
     return null;
   }
 }
 
-export async function savePost(post) {
+export async function fetchUser(uid) {
+  const cached = await getUserProfile(uid);
+  if (cached?.username) return cached;
   try {
-    const all = await fetchPosts();
-    const filtered = all.filter(p => p.id !== post.id);
-    filtered.unshift(post);
-    await AsyncStorage.setItem(POSTS_KEY, JSON.stringify(filtered));
-    console.log('✅ Post guardado localmente');
-  } catch (e) {
-    console.warn('⚠️ Error guardando post local:', e);
-  }
+    const ref = doc(db, 'users', uid);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      const data = snap.data();
+      await saveUserProfile(uid, { username: data.username, email: data.email });
+      return { username: data.username, email: data.email };
+    }
+  } catch {}
+  return null;
 }
 
-// Lee todos los posts
 export async function fetchPosts() {
   try {
-    const s = await AsyncStorage.getItem(POSTS_KEY);
-    return s ? JSON.parse(s) : [];
-  } catch (e) {
-    console.warn('⚠️ Error leyendo posts locales:', e);
-    return [];
-  }
+    const raw = await AsyncStorage.getItem(postsKey);
+    const arr = raw ? JSON.parse(raw) : [];
+    if (Array.isArray(arr)) return arr;
+  } catch {}
+  return [];
+}
+
+export async function savePost(post) {
+  try {
+    const current = await fetchPosts();
+    const next = [post, ...current];
+    await AsyncStorage.setItem(postsKey, JSON.stringify(next));
+  } catch {}
 }

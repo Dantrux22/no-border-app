@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Platform,
   StatusBar as RNStatusBar,
+  Text,
 } from 'react-native';
 import { CommonActions, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,12 +18,14 @@ import { colors } from '../global/colors';
 import PostComponent, { PostItem } from './PostComponent';
 import { auth } from '../firebaseConfig';
 import { signOut } from 'firebase/auth';
-import { fetchUser, fetchPosts } from '../db/localStore';
+import { fetchUser } from '../db/localStore';
+import { addPost, subscribePosts } from '../db/posts';
 
 export default function Home() {
   const [posts, setPosts] = useState([]);
   const [username, setUsername] = useState('usuario');
   const [loading, setLoading] = useState(true);
+  const [clock, setClock] = useState('');
   const navigation = useNavigation();
 
   const topPadding = Platform.OS === 'android' ? RNStatusBar.currentHeight : 0;
@@ -34,20 +37,39 @@ export default function Home() {
       return;
     }
 
-    Promise.all([
-      fetchUser(uid).then(profile => {
+    fetchUser(uid)
+      .then((profile) => {
         if (profile?.username) setUsername(profile.username);
-      }),
-      fetchPosts().then(fetched => {
-        setPosts(fetched);
-      }),
-    ]).finally(() => {
-      setLoading(false);
-    });
+      })
+      .finally(() => setLoading(false));
+
+    const unsub = subscribePosts(setPosts);
+    return () => unsub && unsub();
   }, []);
 
-  const handleAdd = newPost => {
-    setPosts(prev => [newPost, ...prev]);
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      const hh = now.getHours().toString().padStart(2, '0');
+      const mm = now.getMinutes().toString().padStart(2, '0');
+      setClock(`${hh}:${mm}`);
+    };
+    updateTime();
+    const id = setInterval(updateTime, 60000);
+    return () => clearInterval(id);
+  }, []);
+
+  const handleAdd = async ({ text, imageUrl }) => {
+    try {
+      await addPost({
+        userId: auth.currentUser?.uid || null,
+        username,
+        text,
+        imageUrl,
+      });
+    } catch (e) {
+      Alert.alert('Error', 'No se pudo publicar. Intenta de nuevo.');
+    }
   };
 
   const handleLogout = () => {
@@ -69,7 +91,6 @@ export default function Home() {
                 })
               );
             } catch (error) {
-              console.error('Error al cerrar sesión:', error);
               Alert.alert('Error', 'No se pudo cerrar sesión');
             }
           },
@@ -93,11 +114,13 @@ export default function Home() {
         <Ionicons name="log-out-outline" size={24} color={colors.BLANCO} />
       </TouchableOpacity>
 
+      <Text style={styles.greeting}>Hola, @{username} — {clock}</Text>
+
       <PostComponent onAdd={handleAdd} username={username} />
 
       <FlatList
         data={posts}
-        keyExtractor={item => item.id}
+        keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <PostItem post={item} username={username} />
         )}
@@ -131,5 +154,12 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 20,
     elevation: 4,
+  },
+  greeting: {
+    color: colors.TEXTO_PRINCIPAL,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 4,
+    fontWeight: 'bold',
   },
 });

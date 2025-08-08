@@ -1,4 +1,3 @@
-
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { initializeFirestore } from 'firebase/firestore';
@@ -14,8 +13,9 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
+// Tip para RN/Emulador: autodetecta long polling si WebSocket/stream falla.
 export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
+  experimentalAutoDetectLongPolling: true,
   useFetchStreams: false,
 });
 
