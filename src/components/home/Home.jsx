@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { SafeAreaView, FlatList, StyleSheet, View, Alert, TouchableOpacity, ActivityIndicator, Platform, StatusBar as RNStatusBar, Text } from 'react-native';
+import {
+  SafeAreaView, FlatList, StyleSheet, View, Alert, TouchableOpacity,
+  ActivityIndicator, Platform, StatusBar as RNStatusBar,
+} from 'react-native';
 import { CommonActions, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Header from '../Header';
@@ -35,7 +38,13 @@ export default function Home() {
 
   const handleAdd = async ({ text, imageUrl }) => {
     try {
-      await addPost({ userId: auth.currentUser?.uid || null, username, avatar, text, imageUrl });
+      await addPost({
+        userId: auth.currentUser?.uid || null,
+        username,
+        avatar,
+        text,
+        imageUrl,
+      });
     } catch {
       Alert.alert('Error', 'No se pudo publicar. Intenta de nuevo.');
     }
@@ -44,30 +53,44 @@ export default function Home() {
   const handleLogout = () => {
     Alert.alert('Cerrar sesión', '¿Estás seguro de que querés cerrar sesión?', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Sí, salir', style: 'destructive', onPress: async () => {
+      {
+        text: 'Sí, salir',
+        style: 'destructive',
+        onPress: async () => {
           try {
             await signOut(auth);
-            navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'Auth' }] }));
-          } catch { Alert.alert('Error', 'No se pudo cerrar sesión'); }
-        } },
+            navigation.dispatch(
+              CommonActions.reset({ index: 0, routes: [{ name: 'Auth' }] })
+            );
+          } catch {
+            Alert.alert('Error', 'No se pudo cerrar sesión');
+          }
+        },
+      },
     ]);
   };
 
   if (loading) {
-    return (<View style={styles.loadingContainer}><ActivityIndicator size="large" color={colors.PRIMARIO} /></View>);
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.PRIMARIO} />
+      </View>
+    );
   }
 
   return (
     <SafeAreaView style={[styles.container, { paddingTop: topPadding }]}>
-      <Header title="No Border" avatar={avatar} />
+      {/* Header con avatar + @username + marca */}
+      <Header username={username} avatar={avatar} />
+
       <TouchableOpacity onPress={handleLogout} style={styles.logoutIcon}>
         <Ionicons name="log-out-outline" size={24} color={colors.BLANCO} />
       </TouchableOpacity>
 
-      <Text style={styles.greeting}>Hola, @{username}</Text>
-
+      {/* Publicar */}
       <PostComponent onAdd={handleAdd} username={username} />
 
+      {/* Feed */}
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
@@ -83,6 +106,14 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.FONDO },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.FONDO },
   feed: { paddingBottom: 80 },
-  logoutIcon: { position: 'absolute', top: Platform.OS === 'android' ? RNStatusBar.currentHeight + 12 : 40, right: 20, zIndex: 10, backgroundColor: colors.FONDO_CARDS, padding: 8, borderRadius: 20, elevation: 4 },
-  greeting: { color: colors.TEXTO_PRINCIPAL, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4, fontWeight: 'bold' },
+  logoutIcon: {
+    position: 'absolute',
+    top: Platform.OS === 'android' ? RNStatusBar.currentHeight + 12 : 40,
+    right: 20,
+    zIndex: 10,
+    backgroundColor: colors.FONDO_CARDS,
+    padding: 8,
+    borderRadius: 20,
+    elevation: 4,
+  },
 });

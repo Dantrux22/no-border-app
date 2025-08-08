@@ -56,7 +56,6 @@ export default function AuthScreen() {
       );
       const uid = cred.user.uid;
 
-      // Traer perfil (cache -> Firestore) y guardar en cache si hace falta
       let profile = await getUserProfile(uid);
       if (!profile) {
         const snap = await getDoc(doc(db, 'users', uid));
@@ -95,7 +94,6 @@ export default function AuthScreen() {
       );
       const uid = cred.user.uid;
 
-      // Guardar en cache primero (para que el resto de pantallas ya tengan data)
       const profile = {
         username: username.trim(),
         email: regEmail.trim(),
@@ -103,11 +101,9 @@ export default function AuthScreen() {
       };
       await saveUserProfile(uid, { username: profile.username, email: profile.email });
 
-      // Escribir en Firestore con timeout (para no colgarnos en el emulador)
       const write = setDoc(doc(db, 'users', uid), profile, { merge: true });
       const res = await withTimeout(write, 5000);
       if (res === 'TIMEOUT') {
-        // seguimos, y dejamos que termine en background
         write.catch(() => {});
       }
 

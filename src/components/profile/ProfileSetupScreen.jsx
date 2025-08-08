@@ -26,7 +26,7 @@ function withTimeout(promise, ms) {
 export default function ProfileSetupScreen() {
   const nav = useNavigation();
 
-  const [tab, setTab] = useState('emoji'); // 'emoji' | 'foto'
+  const [tab, setTab] = useState('emoji'); 
   const [emoji, setEmoji] = useState(EMOJIS[0]);
   const [imageUri, setImageUri] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -54,7 +54,6 @@ export default function ProfileSetupScreen() {
     const uid = auth.currentUser?.uid;
     if (!uid) return Alert.alert('Ups', 'No hay usuario autenticado.');
 
-    // Si están en Foto, bloqueamos guardado y los movemos a Emoji
     if (tab === 'foto') {
       Alert.alert(
         'Opción no disponible',
@@ -152,7 +151,6 @@ export default function ProfileSetupScreen() {
 const SIZE = 64;
 
 const styles = StyleSheet.create({
-  // Pantalla centrada
   screen: {
     flex: 1,
     backgroundColor: colors.FONDO,
@@ -160,7 +158,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 16,
   },
-  // Tarjeta central para contener todo alineado
   centerCard: {
     width: '100%',
     maxWidth: 420,

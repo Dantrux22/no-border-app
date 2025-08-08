@@ -7,11 +7,11 @@ export async function addPost({ userId, username, avatar, text, imageUrl }) {
   return await addDoc(POSTS, {
     userId: userId || null,
     username: username || 'usuario',
-    avatar: avatar || '🙂',        // emoji o URL
+    avatar: avatar || '🙂',        
     text: text || '',
     imageUrl: imageUrl || null,
-    createdAt: serverTimestamp(),  // server
-    createdAtClient: Date.now(),   // fallback inmediato
+    createdAt: serverTimestamp(),  
+    createdAtClient: Date.now(),   
     likesCount: 0,
     savesCount: 0,
   });
