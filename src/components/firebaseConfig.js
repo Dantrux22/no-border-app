@@ -1,6 +1,9 @@
+// src/components/firebaseConfig.js
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { initializeFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyAYEs940csQs3OoiNpXQ3D-Q8YvZQVg4Xk',
@@ -13,10 +16,14 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-// Tip para RN/Emulador: autodetecta long polling si WebSocket/stream falla.
+export const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(AsyncStorage),
+});
+
 export const db = initializeFirestore(app, {
   experimentalAutoDetectLongPolling: true,
   useFetchStreams: false,
 });
 
-export const auth = getAuth(app);
+// 👇 fuerza el bucket explícitamente
+export const storage = getStorage(app, 'gs://no-border-app.appspot.com');

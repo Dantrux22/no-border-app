@@ -1,94 +1,120 @@
 import React, { useState } from 'react';
-import { useNavigation } from '@react-navigation/native';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-  Alert,
-  StatusBar,
+  View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert,
+  StyleSheet, StatusBar, KeyboardAvoidingView, Platform, ToastAndroid,
 } from 'react-native';
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-} from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
-
+import { useNavigation } from '@react-navigation/native';
 import { auth, db } from '../firebaseConfig';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { colors } from '../global/colors';
+import { saveUserProfile, getUserProfile } from '../db/localStore';
+
+function withTimeout(promise, ms) {
+  let t;
+  return Promise.race([
+    promise.finally(() => clearTimeout(t)),
+    new Promise(resolve => { t = setTimeout(() => resolve('TIMEOUT'), ms); }),
+  ]);
+}
 
 export default function AuthScreen() {
   const navigation = useNavigation();
   const [isRegistering, setIsRegistering] = useState(false);
 
-  // Estados de login
-  const [loginEmail, setLoginEmail]       = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPass, setLoginPass] = useState('');
 
-  // Estados de registro
-  const [registerEmail, setRegisterEmail]       = useState('');
-  const [registerPassword, setRegisterPassword] = useState('');
-  const [username, setUsername]                 = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regPass, setRegPass] = useState('');
+  const [username, setUsername] = useState('');
 
   const [loading, setLoading] = useState(false);
 
   const switchToLogin = () => {
     setIsRegistering(false);
-    // Opcional: limpiar campos de registro
-    setRegisterEmail('');
-    setRegisterPassword('');
+    setRegEmail('');
+    setRegPass('');
     setUsername('');
   };
-
   const switchToRegister = () => {
     setIsRegistering(true);
-    // Opcional: limpiar campos de login
     setLoginEmail('');
-    setLoginPassword('');
+    setLoginPass('');
   };
 
   const handleLogin = async () => {
+    if (!loginEmail.trim() || !loginPass) {
+      return Alert.alert('Error', 'Email y contraseña son obligatorios');
+    }
     setLoading(true);
     try {
-      const { user } = await signInWithEmailAndPassword(
+      const cred = await signInWithEmailAndPassword(
         auth,
-        loginEmail,
-        loginPassword
+        loginEmail.trim(),
+        loginPass
       );
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Home' }],
-      });
-    } catch (error) {
-      Alert.alert('Error al iniciar sesión', error.message);
+      const uid = cred.user.uid;
+
+      // Traer perfil (cache -> Firestore) y guardar en cache si hace falta
+      let profile = await getUserProfile(uid);
+      if (!profile) {
+        const snap = await getDoc(doc(db, 'users', uid));
+        if (snap.exists()) {
+          profile = snap.data();
+          await saveUserProfile(uid, profile);
+        }
+      }
+
+      ToastAndroid.show('Login correcto ✅', ToastAndroid.SHORT);
+      if (!profile?.avatar) {
+        navigation.reset({ index: 0, routes: [{ name: 'ProfileSetup' }] });
+      } else {
+        navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+      }
+    } catch (e) {
+      Alert.alert('Error al iniciar sesión', e.message);
     } finally {
       setLoading(false);
     }
   };
 
   const handleRegister = async () => {
+    if (!username.trim()) {
+      return Alert.alert('Error', 'El nombre de usuario es obligatorio');
+    }
+    if (!regEmail.trim() || !regPass) {
+      return Alert.alert('Error', 'Email y contraseña son obligatorios');
+    }
     setLoading(true);
     try {
-      const { user } = await createUserWithEmailAndPassword(
+      const cred = await createUserWithEmailAndPassword(
         auth,
-        registerEmail,
-        registerPassword
+        regEmail.trim(),
+        regPass
       );
-      await setDoc(doc(db, 'users', user.uid), {
-        email: registerEmail,
-        username,
-        createdAt: new Date(),
-      });
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Home' }],
-      });
-    } catch (error) {
-      Alert.alert('Error al registrar', error.message);
+      const uid = cred.user.uid;
+
+      // Guardar en cache primero (para que el resto de pantallas ya tengan data)
+      const profile = {
+        username: username.trim(),
+        email: regEmail.trim(),
+        createdAt: serverTimestamp(),
+      };
+      await saveUserProfile(uid, { username: profile.username, email: profile.email });
+
+      // Escribir en Firestore con timeout (para no colgarnos en el emulador)
+      const write = setDoc(doc(db, 'users', uid), profile, { merge: true });
+      const res = await withTimeout(write, 5000);
+      if (res === 'TIMEOUT') {
+        // seguimos, y dejamos que termine en background
+        write.catch(() => {});
+      }
+
+      ToastAndroid.show('Cuenta creada 🎉 Elegí tu avatar', ToastAndroid.SHORT);
+      navigation.reset({ index: 0, routes: [{ name: 'ProfileSetup' }] });
+    } catch (e) {
+      Alert.alert('Error al registrar', e.message);
     } finally {
       setLoading(false);
     }
@@ -120,48 +146,48 @@ export default function AuthScreen() {
         {isRegistering ? (
           <>
             <TextInput
+              style={styles.input}
               placeholder="Nombre de usuario"
               placeholderTextColor={colors.TEXTO_SECUNDARIO}
-              style={styles.input}
               value={username}
               onChangeText={setUsername}
             />
             <TextInput
+              style={styles.input}
               placeholder="Email"
               placeholderTextColor={colors.TEXTO_SECUNDARIO}
-              style={styles.input}
-              value={registerEmail}
-              onChangeText={setRegisterEmail}
               autoCapitalize="none"
               keyboardType="email-address"
+              value={regEmail}
+              onChangeText={setRegEmail}
             />
             <TextInput
+              style={styles.input}
               placeholder="Contraseña"
               placeholderTextColor={colors.TEXTO_SECUNDARIO}
-              style={styles.input}
-              value={registerPassword}
-              onChangeText={setRegisterPassword}
               secureTextEntry
+              value={regPass}
+              onChangeText={setRegPass}
             />
           </>
         ) : (
           <>
             <TextInput
+              style={styles.input}
               placeholder="Email"
               placeholderTextColor={colors.TEXTO_SECUNDARIO}
-              style={styles.input}
-              value={loginEmail}
-              onChangeText={setLoginEmail}
               autoCapitalize="none"
               keyboardType="email-address"
+              value={loginEmail}
+              onChangeText={setLoginEmail}
             />
             <TextInput
+              style={styles.input}
               placeholder="Contraseña"
               placeholderTextColor={colors.TEXTO_SECUNDARIO}
-              style={styles.input}
-              value={loginPassword}
-              onChangeText={setLoginPassword}
               secureTextEntry
+              value={loginPass}
+              onChangeText={setLoginPass}
             />
           </>
         )}
@@ -184,13 +210,35 @@ export default function AuthScreen() {
 }
 
 const styles = StyleSheet.create({
-  container:      { flex: 1, backgroundColor: colors.FONDO, justifyContent: 'center', padding: 16 },
-  toggleContainer: { flexDirection: 'row', marginBottom: 24 },
-  toggleButton:   { flex: 1, paddingVertical: 12, borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  activeToggle:   { borderBottomColor: colors.PRIMARIO },
-  toggleText:     { textAlign: 'center', color: colors.BLANCO, fontWeight: 'bold', fontSize: 16 },
-  formContainer:  { width: '100%' },
-  input:          {
+  container: {
+    flex: 1,
+    backgroundColor: colors.FONDO,
+    justifyContent: 'center',
+    padding: 16,
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    marginBottom: 24,
+  },
+  toggleButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  activeToggle: {
+    borderBottomColor: colors.PRIMARIO,
+  },
+  toggleText: {
+    textAlign: 'center',
+    color: colors.BLANCO,
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  formContainer: {
+    width: '100%',
+  },
+  input: {
     height: 48,
     borderColor: colors.GRIS_INTERMEDIO,
     borderWidth: 1,
@@ -199,6 +247,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     color: colors.TEXTO_PRINCIPAL,
   },
-  button:         { height: 48, backgroundColor: colors.PRIMARIO, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
-  buttonText:     { color: colors.BLANCO, fontWeight: 'bold', fontSize: 16 },
+  button: {
+    height: 48,
+    backgroundColor: colors.PRIMARIO,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: colors.BLANCO,
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
 });
