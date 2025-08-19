@@ -1,125 +1,216 @@
-import React, { useState } from 'react';
+// src/components/auth/AuthScreen.jsx
+import React, { useEffect, useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert,
-  StyleSheet, StatusBar, KeyboardAvoidingView, Platform, ToastAndroid,
+  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { auth, db } from '../firebaseConfig';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { useDispatch } from 'react-redux';
+import { useNavigation, CommonActions } from '@react-navigation/native';
 import { colors } from '../global/colors';
-import { saveUserProfile, getUserProfile } from '../db/localStore';
+import { setUser } from '../../redux/userSlice';
+import {
+  registerUser,
+  loginUser,
+  isProfileCompleted,
+  getCurrentUserId,
+} from '../../db/auth';
 
-function withTimeout(promise, ms) {
-  let t;
-  return Promise.race([
-    promise.finally(() => clearTimeout(t)),
-    new Promise(resolve => { t = setTimeout(() => resolve('TIMEOUT'), ms); }),
-  ]);
+function friendly(e) {
+  const code = e?.code || '';
+  if (code === 'missing-fields') return 'Completá los campos requeridos.';
+  if (code === 'email-already-in-use') return 'Ese email ya está registrado.';
+  if (code === 'username-already-in-use') return 'Ese @username ya existe.';
+  if (code === 'user-not-found') return 'No existe una cuenta con ese email.';
+  if (code === 'wrong-password') return 'Contraseña incorrecta.';
+  return 'No se pudo procesar tu solicitud.';
 }
 
 export default function AuthScreen() {
+  const dispatch = useDispatch();
   const navigation = useNavigation();
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [loginEmail, setLoginEmail] = useState(''); const [loginPass, setLoginPass] = useState('');
-  const [regEmail, setRegEmail] = useState(''); const [regPass, setRegPass] = useState(''); const [username, setUsername] = useState('');
+  const [mode, setMode] = useState('login'); // 'login' | 'signup'
+
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPass, setLoginPass] = useState('');
+  const [signupUsername, setSignupUsername] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPass, setSignupPass] = useState('');
+
   const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState(null);
 
-  const switchToLogin = () => { setIsRegistering(false); setRegEmail(''); setRegPass(''); setUsername(''); };
-  const switchToRegister = () => { setIsRegistering(true); setLoginEmail(''); setLoginPass(''); };
+  const resetTo = (name, params) =>
+    navigation.dispatch(
+      CommonActions.reset({ index: 0, routes: [{ name, params }] })
+    );
 
-  const handleLogin = async () => {
-    if (!loginEmail.trim() || !loginPass) return Alert.alert('Error', 'Email y contraseña son obligatorios');
-    setLoading(true);
-    try {
-      const cred = await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPass);
-      const uid = cred.user.uid;
-      let profile = await getUserProfile(uid);
-      if (!profile) {
-        const snap = await getDoc(doc(db, 'users', uid));
-        if (snap.exists()) { profile = snap.data(); await saveUserProfile(uid, profile); }
+  // Si ya hay sesión al montar, redirigir según estado de perfil
+  useEffect(() => {
+    (async () => {
+      try {
+        const uid = await getCurrentUserId();
+        if (!uid) return;
+        const completed = await isProfileCompleted(uid);
+        if (!completed) {
+          resetTo('ProfileSetup', { userId: uid });
+        } else {
+          resetTo('Home');
+        }
+      } catch {
+        /* no-op */
       }
-      ToastAndroid.show('Login correcto ✅', ToastAndroid.SHORT);
-      if (!profile?.avatar) navigation.reset({ index: 0, routes: [{ name: 'ProfileSetup' }] });
-      else navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
-    } catch (e) {
-      Alert.alert('Error al iniciar sesión', e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    })();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleRegister = async () => {
-    if (!username.trim()) return Alert.alert('Error', 'El nombre de usuario es obligatorio');
-    if (!regEmail.trim() || !regPass) return Alert.alert('Error', 'Email y contraseña son obligatorios');
+  const onSignup = async () => {
+    const email = signupEmail.trim();
+    const password = signupPass;
+    const username = signupUsername.trim();
+    if (!email || !password || !username) return setErr('Completá email, contraseña y username.');
+    setErr(null);
     setLoading(true);
     try {
-      const cred = await createUserWithEmailAndPassword(auth, regEmail.trim(), regPass);
-      const uid = cred.user.uid;
-
-      const profile = { username: username.trim(), email: regEmail.trim(), createdAt: serverTimestamp() };
-      await saveUserProfile(uid, { username: profile.username, email: profile.email });
-
-      const write = setDoc(doc(db, 'users', uid), profile, { merge: true });
-      const res = await withTimeout(write, 5000);
-      if (res === 'TIMEOUT') write.catch(() => {});
-
-      ToastAndroid.show('Cuenta creada 🎉 Elegí tu avatar', ToastAndroid.SHORT);
-      navigation.reset({ index: 0, routes: [{ name: 'ProfileSetup' }] });
+      const user = await registerUser({ email, password, username });
+      dispatch(setUser(user));
+      // Onboarding: ir a configurar perfil en el mismo Drawer
+      resetTo('ProfileSetup', { userId: user.id });
     } catch (e) {
-      Alert.alert('Error al registrar', e.message);
+      console.log('❌ signup sqlite error:', e);
+      setErr(friendly(e));
     } finally {
       setLoading(false);
     }
   };
+
+  const onLogin = async () => {
+    const email = loginEmail.trim();
+    const password = loginPass;
+    if (!email || !password) return setErr('Completá email y contraseña.');
+    setErr(null);
+    setLoading(true);
+    try {
+      const user = await loginUser({ email, password });
+      dispatch(setUser(user));
+      const completed = await isProfileCompleted(user.id);
+      if (!completed) {
+        resetTo('ProfileSetup', { userId: user.id });
+      } else {
+        resetTo('Home');
+      }
+    } catch (e) {
+      console.log('❌ login sqlite error:', e);
+      setErr(friendly(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const isLogin = mode === 'login';
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.FONDO} />
+    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View style={styles.card}>
+        <Text style={styles.title}>No Border</Text>
 
-      <View style={styles.toggleContainer}>
-        <TouchableOpacity onPress={switchToLogin} style={[styles.toggleButton, !isRegistering && styles.activeToggle]}>
-          <Text style={styles.toggleText}>Login</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={switchToRegister} style={[styles.toggleButton, isRegistering && styles.activeToggle]}>
-          <Text style={styles.toggleText}>Registro</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.formContainer}>
-        {isRegistering ? (
-          <>
-            <TextInput style={styles.input} placeholder="Nombre de usuario" placeholderTextColor={colors.TEXTO_SECUNDARIO} value={username} onChangeText={setUsername} />
-            <TextInput style={styles.input} placeholder="Email" placeholderTextColor={colors.TEXTO_SECUNDARIO} autoCapitalize="none" keyboardType="email-address" value={regEmail} onChangeText={setRegEmail} />
-            <TextInput style={styles.input} placeholder="Contraseña" placeholderTextColor={colors.TEXTO_SECUNDARIO} secureTextEntry value={regPass} onChangeText={setRegPass} />
-          </>
-        ) : (
-          <>
-            <TextInput style={styles.input} placeholder="Email" placeholderTextColor={colors.TEXTO_SECUNDARIO} autoCapitalize="none" keyboardType="email-address" value={loginEmail} onChangeText={setLoginEmail} />
-            <TextInput style={styles.input} placeholder="Contraseña" placeholderTextColor={colors.TEXTO_SECUNDARIO} secureTextEntry value={loginPass} onChangeText={setLoginPass} />
-          </>
-        )}
-
-        {loading ? (
-          <ActivityIndicator size="large" color={colors.PRIMARIO} />
-        ) : (
-          <TouchableOpacity style={styles.button} onPress={isRegistering ? handleRegister : handleLogin}>
-            <Text style={styles.buttonText}>{isRegistering ? 'Crear cuenta' : 'Iniciar sesión'}</Text>
+        <View style={styles.tabs}>
+          <TouchableOpacity
+            style={[styles.tab, isLogin && styles.tabActive]}
+            onPress={() => { setMode('login'); setErr(null); }}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.tabText}>Iniciar sesión</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, !isLogin && styles.tabActive]}
+            onPress={() => { setMode('signup'); setErr(null); }}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.tabText}>Crear cuenta</Text>
+          </TouchableOpacity>
+        </View>
+
+        {isLogin ? (
+          <>
+            <TextInput
+              placeholder="Email"
+              placeholderTextColor={colors.TEXTO_PRINCIPAL + '88'}
+              style={styles.input}
+              value={loginEmail}
+              onChangeText={setLoginEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <TextInput
+              placeholder="Contraseña"
+              placeholderTextColor={colors.TEXTO_PRINCIPAL + '88'}
+              style={styles.input}
+              value={loginPass}
+              onChangeText={setLoginPass}
+              secureTextEntry
+            />
+          </>
+        ) : (
+          <>
+            <TextInput
+              placeholder="Username"
+              placeholderTextColor={colors.TEXTO_PRINCIPAL + '88'}
+              style={styles.input}
+              value={signupUsername}
+              onChangeText={setSignupUsername}
+              autoCapitalize="none"
+            />
+            <TextInput
+              placeholder="Email"
+              placeholderTextColor={colors.TEXTO_PRINCIPAL + '88'}
+              style={styles.input}
+              value={signupEmail}
+              onChangeText={setSignupEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <TextInput
+              placeholder="Contraseña"
+              placeholderTextColor={colors.TEXTO_PRINCIPAL + '88'}
+              style={styles.input}
+              value={signupPass}
+              onChangeText={setSignupPass}
+              secureTextEntry
+            />
+          </>
         )}
+
+        {!!err && <Text style={{ color: '#ff7b7b', textAlign: 'center' }}>{err}</Text>}
+
+        <TouchableOpacity
+          style={[styles.btn, { backgroundColor: colors.PRIMARIO }, loading && { opacity: 0.7 }]}
+          onPress={isLogin ? onLogin : onSignup}
+          disabled={loading}
+          activeOpacity={0.9}
+        >
+          {loading
+            ? <ActivityIndicator color={colors.BLANCO} />
+            : <Text style={styles.btnText}>{isLogin ? 'Entrar' : 'Crear cuenta'}</Text>}
+        </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
 }
 
+/* Estilos que pediste mantener */
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.FONDO, justifyContent: 'center', padding: 16 },
-  toggleContainer: { flexDirection: 'row', marginBottom: 24 },
-  toggleButton: { flex: 1, paddingVertical: 12, borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  activeToggle: { borderBottomColor: colors.PRIMARIO },
-  toggleText: { textAlign: 'center', color: colors.BLANCO, fontWeight: 'bold', fontSize: 16 },
-  formContainer: { width: '100%' },
-  input: { height: 48, borderColor: colors.GRIS_INTERMEDIO, borderWidth: 1, borderRadius: 8, marginBottom: 16, paddingHorizontal: 12, color: colors.TEXTO_PRINCIPAL },
-  button: { height: 48, backgroundColor: colors.PRIMARIO, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
-  buttonText: { color: colors.BLANCO, fontWeight: 'bold', fontSize: 16 },
+  screen: { flex: 1, backgroundColor: colors.FONDO, alignItems: 'center', justifyContent: 'center', padding: 16 },
+  card: { width: '100%', maxWidth: 420, gap: 12 },
+  title: { color: colors.TEXTO_PRINCIPAL, fontSize: 28, fontWeight: '900', textAlign: 'center', marginBottom: 6 },
+  tabs: { flexDirection: 'row', borderRadius: 10, overflow: 'hidden', marginBottom: 8, alignSelf: 'center' },
+  tab: { paddingVertical: 10, paddingHorizontal: 18, backgroundColor: colors.FONDO_CARDS },
+  tabActive: { backgroundColor: colors.PRIMARIO },
+  tabText: { color: colors.BLANCO, fontWeight: '700' },
+  input: {
+    backgroundColor: colors.FONDO_CARDS,
+    color: colors.TEXTO_PRINCIPAL,
+    paddingVertical: 12, paddingHorizontal: 14,
+    borderRadius: 10,
+  },
+  btn: { paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
+  btnText: { color: colors.BLANCO, fontWeight: 'bold', textAlign: 'center' },
 });

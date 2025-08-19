@@ -1,83 +1,71 @@
 // src/components/profile/ProfileSetupScreen.jsx
 import React, { useState } from 'react';
-import {
-  View, Text, TouchableOpacity, StyleSheet, FlatList, Alert, Image
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, Alert, Image } from 'react-native';
+import { useNavigation, useRoute, CommonActions } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import { useNavigation } from '@react-navigation/native';
-import { auth, db } from '../firebaseConfig';
-import { doc, setDoc } from 'firebase/firestore';
 import { colors } from '../global/colors';
-import { saveUserProfile } from '../db/localStore';
+import {
+  updateUserAvatar,
+  updateUserAvatarUrl,
+  getCurrentUserId,
+  markProfileCompleted,
+} from '../../db/auth';
 
-const EMOJIS = [
-  '🦊','🐨','🐯','🐸','🐵','🐶','🐱','🦁','🐼','🦄',
-  '🧑','👩','👨','🧔','👩‍🦰','👨‍🦱','👩‍🦳','👨‍🦲','👩‍🎨','🕵️‍♂️'
-];
-
-function withTimeout(promise, ms) {
-  let t;
-  return Promise.race([
-    promise.finally(() => clearTimeout(t)),
-    new Promise(resolve => { t = setTimeout(() => resolve('TIMEOUT'), ms); }),
-  ]);
-}
+const EMOJIS = ['🦊','🐨','🐯','🐸','🐵','🐶','🐱','🦁','🐼','🦄','🧑','👩','👨','🧔','👩‍🦰','👨‍🦱','👩‍🦳','👨‍🦲','👩‍🎨','🕵️‍♂️'];
 
 export default function ProfileSetupScreen() {
-  const nav = useNavigation();
+  const navigation = useNavigation();
+  const route = useRoute();
 
-  const [tab, setTab] = useState('emoji'); 
+  const [tab, setTab] = useState('emoji');
   const [emoji, setEmoji] = useState(EMOJIS[0]);
   const [imageUri, setImageUri] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const goEmoji = () => {
-    setImageUri(null);
-    setTab('emoji');
-  };
+  const resetTo = (name, params) =>
+    navigation.dispatch(
+      CommonActions.reset({ index: 0, routes: [{ name, params }] })
+    );
 
   const pickFromGallery = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      return Alert.alert('Permiso requerido', 'Otorgá permisos para la galería.');
-    }
+    if (status !== 'granted') return Alert.alert('Permiso requerido', 'Otorgá permisos para la galería.');
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
+      quality: 0.9,
     });
-    if (!res.canceled && res.assets?.length) {
-      setImageUri(res.assets[0].uri);
-    }
+    if (!res.canceled && res.assets?.length) setImageUri(res.assets[0].uri);
+  };
+
+  const resolveUserId = async () => {
+    const paramId = route?.params?.userId;
+    if (paramId) return paramId;
+    return await getCurrentUserId();
   };
 
   const handleSave = async () => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return Alert.alert('Ups', 'No hay usuario autenticado.');
-
-    if (tab === 'foto') {
-      Alert.alert(
-        'Opción no disponible',
-        'Subir foto de perfil no está disponible (plan pago). Elegí un emoji en la otra pestaña.',
-        [{ text: 'OK', onPress: goEmoji }]
-      );
-      return;
-    }
+    const uid = await resolveUserId();
+    if (!uid) return Alert.alert('Ups', 'No hay sesión activa.');
 
     setSaving(true);
     try {
-      // Guardar en Firestore con timeout: si tarda, igual navegamos
-      const write = setDoc(doc(db, 'users', uid), { avatar: emoji }, { merge: true });
-      const res = await withTimeout(write, 4000);
-      // Cache local para que Home ya lo tenga
-      await saveUserProfile(uid, { avatar: emoji });
-      // Ir al Home aunque el write siga (en emulador puede demorar)
-      nav.reset({ index: 0, routes: [{ name: 'Home' }] });
-      if (res === 'TIMEOUT') {
-        // Dejar terminar en background, silenciar error
-        write.catch(() => {});
+      if (tab === 'emoji') {
+        await updateUserAvatar(uid, emoji);
+        await updateUserAvatarUrl(uid, null);
+      } else {
+        if (!imageUri) {
+          setSaving(false);
+          return Alert.alert('Elegí una imagen primero.');
+        }
+        await updateUserAvatarUrl(uid, imageUri);
       }
+      await markProfileCompleted(uid, 1);
+      // IMPORTANTE: resetear al Drawer 'Home' (no usar replace)
+      resetTo('Home');
+      // Alternativa simple (deja back a esta pantalla): navigation.navigate('Home');
     } catch (e) {
-      Alert.alert('Error', 'No se pudo guardar el avatar. Intentá de nuevo.');
+      console.log('❌ profile save error:', e);
+      Alert.alert('Error', 'No se pudo guardar el avatar.');
     } finally {
       setSaving(false);
     }
@@ -88,18 +76,11 @@ export default function ProfileSetupScreen() {
       <View style={styles.centerCard}>
         <Text style={styles.title}>Elegí tu avatar para tu perfil</Text>
 
-        {/* Tabs */}
         <View style={styles.tabs}>
-          <TouchableOpacity
-            onPress={() => setTab('emoji')}
-            style={[styles.tab, tab === 'emoji' && styles.tabActive]}
-          >
+          <TouchableOpacity onPress={() => setTab('emoji')} style={[styles.tab, tab === 'emoji' && styles.tabActive]}>
             <Text style={styles.tabText}>Emoji</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setTab('foto')}
-            style={[styles.tab, tab === 'foto' && styles.tabActive]}
-          >
+          <TouchableOpacity onPress={() => setTab('foto')} style={[styles.tab, tab === 'foto' && styles.tabActive]}>
             <Text style={styles.tabText}>Foto</Text>
           </TouchableOpacity>
         </View>
@@ -113,10 +94,7 @@ export default function ProfileSetupScreen() {
             renderItem={({ item }) => {
               const sel = emoji === item;
               return (
-                <TouchableOpacity
-                  onPress={() => setEmoji(item)}
-                  style={[styles.emojiItem, sel && styles.emojiItemSel]}
-                >
+                <TouchableOpacity onPress={() => setEmoji(item)} style={[styles.emojiItem, sel && styles.emojiItemSel]}>
                   <Text style={styles.emoji}>{item}</Text>
                 </TouchableOpacity>
               );
@@ -124,16 +102,9 @@ export default function ProfileSetupScreen() {
           />
         ) : (
           <View style={styles.fotoContainer}>
-            <Text style={styles.notice}>(opción no disponible – plan pago)</Text>
-
-            {imageUri ? (
-              <Image source={{ uri: imageUri }} style={styles.preview} />
-            ) : (
-              <View style={styles.previewPlaceholder}>
-                <Text style={styles.previewText}>Sin foto</Text>
-              </View>
+            {imageUri ? <Image source={{ uri: imageUri }} style={styles.preview} /> : (
+              <View style={styles.previewPlaceholder}><Text style={styles.previewText}>Sin foto</Text></View>
             )}
-
             <TouchableOpacity style={styles.ghostBtn} onPress={pickFromGallery}>
               <Text style={styles.ghostBtnText}>Elegir foto de galería</Text>
             </TouchableOpacity>
@@ -151,41 +122,18 @@ export default function ProfileSetupScreen() {
 const SIZE = 64;
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.FONDO,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-  },
-  centerCard: {
-    width: '100%',
-    maxWidth: 420,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    color: colors.TEXTO_PRINCIPAL,
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
+  screen: { flex: 1, backgroundColor: colors.FONDO, alignItems: 'center', justifyContent: 'center', padding: 16 },
+  centerCard: { width: '100%', maxWidth: 420, alignItems: 'center', justifyContent: 'center' },
+  title: { color: colors.TEXTO_PRINCIPAL, fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginBottom: 16 },
 
-  tabs: {
-    flexDirection: 'row',
-    borderRadius: 10,
-    overflow: 'hidden',
-    marginBottom: 14,
-    alignSelf: 'center',
-  },
+  tabs: { flexDirection: 'row', borderRadius: 10, overflow: 'hidden', marginBottom: 14, alignSelf: 'center' },
   tab: { flex: 1, paddingVertical: 10, paddingHorizontal: 18, backgroundColor: colors.FONDO_CARDS, alignItems: 'center' },
   tabActive: { backgroundColor: colors.PRIMARIO },
   tabText: { color: colors.BLANCO, fontWeight: '600' },
 
   grid: { alignItems: 'center', justifyContent: 'center', gap: 12, paddingVertical: 8 },
   emojiItem: {
-    width: SIZE, height: SIZE, borderRadius: SIZE/2,
+    width: SIZE, height: SIZE, borderRadius: SIZE / 2,
     backgroundColor: colors.FONDO_CARDS,
     alignItems: 'center', justifyContent: 'center',
     margin: 8, borderWidth: 2, borderColor: 'transparent',
@@ -194,7 +142,6 @@ const styles = StyleSheet.create({
   emoji: { fontSize: 28 },
 
   fotoContainer: { alignItems: 'center', marginVertical: 8 },
-  notice: { color: colors.TEXTO_SECUNDARIO, marginBottom: 8, textAlign: 'center' },
   preview: { width: 160, height: 160, borderRadius: 80, marginBottom: 12 },
   previewPlaceholder: {
     width: 160, height: 160, borderRadius: 80, backgroundColor: colors.FONDO_CARDS,
