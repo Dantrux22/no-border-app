@@ -7,12 +7,13 @@ src
 │   │   └── colors.js
 │   ├── Header.jsx
 │   ├── home
+│   │   ├── GuardedHome.jsx
 │   │   ├── Home.jsx
 │   │   ├── PostComponent.jsx
 │   │   └── SavedPostsScreen.jsx
 │   └── profile
-│       ├── ProfileScreen.jsx
-│       └── ProfileSetupScreen.jsx
+│       ├── ProfileSetupScreen.jsx
+│       └── UserProfileScreen.jsx
 ├── db
 │   ├── auth.jsx
 │   ├── database.js
@@ -22,11 +23,12 @@ src
 │   └── users.js
 ├── firebaseConfig.js
 ├── navigation
-│   └── DrawerNavigator.jsx
+│   ├── DrawerNavigator.jsx
+│   └── navigationRef.js
 └── redux
     ├── services
     │   └── postsApi.js
     ├── store.js
     └── userSlice.js
 
-10 directories, 20 files
+10 directories, 22 files
