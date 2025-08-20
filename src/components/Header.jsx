@@ -8,6 +8,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { colors } from './global/colors';
 import { navigationRef } from '../navigation/navigationRef';
 import { clearUser } from '../redux/userSlice';
+import { logoutUser } from '../db/auth'; // 👈 añadido: limpia la sesión en SQLite
 
 export default function Header() {
   const dispatch = useDispatch();
@@ -46,7 +47,20 @@ export default function Header() {
   const handleLogout = async () => {
     if (loggingOut) return;
     setLoggingOut(true);
-    try { dispatch(clearUser()); } finally { setLoggingOut(false); closeMenu(); }
+    try {
+      // 🔐 Limpia sesión persistida en SQLite
+      await logoutUser();
+      // 🗑️ Limpia el estado global
+      dispatch(clearUser());
+    } catch (e) {
+      console.log('❌ logout sqlite error:', e);
+    } finally {
+      setLoggingOut(false);
+      closeMenu();
+      // La navegación a Auth/guardias la resolvés con GuardedHome;
+      // si quisieras forzar acá, podrías:
+      // navigationRef.navigate('Auth');
+    }
   };
 
   return (
@@ -55,7 +69,7 @@ export default function Header() {
         <TouchableOpacity onPress={openMenu} style={styles.left} activeOpacity={0.7}>
           <View style={styles.avatar}>
             {isUrl ? (
-              <Image source={{ uri: avatarUrl }} style={styles.avatarImg} />
+              <Image source={{ uri: avatarUrl }} style={styles.avatarImg} onError={() => { /* fallback se mantiene en emoji si querés manejarlo */ }} />
             ) : (
               <Text style={styles.avatarEmoji}>{avatarEmoji}</Text>
             )}

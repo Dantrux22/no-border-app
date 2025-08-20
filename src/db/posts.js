@@ -1,18 +1,21 @@
 // src/db/posts.js
-import * as SQLite from 'expo-sqlite';
+import { getDB } from './database';
 
-const DB_NAME = 'no-border.db';
-let dbPromise = null;
+function simpleId(prefix = 'p_') {
+  return prefix + Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
 
-async function getDb() {
-  if (!dbPromise) dbPromise = SQLite.openDatabaseAsync(DB_NAME);
-  return dbPromise;
+// ---- helpers de migración ----
+async function columnExists(db, table, col) {
+  const rows = await db.getAllAsync(`PRAGMA table_info(${table});`);
+  return rows.some((r) => r.name === col);
 }
 
 async function ensureTables() {
-  const db = await getDb();
+  const db = await getDB();
   await db.execAsync(`PRAGMA foreign_keys = ON;`);
 
+  // Esquema de users compatible con auth.jsx
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY NOT NULL,
@@ -21,20 +24,35 @@ async function ensureTables() {
       username TEXT UNIQUE NOT NULL,
       avatar TEXT,
       avatar_url TEXT,
-      created_at TEXT DEFAULT (datetime('now'))
+      profile_completed INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
   `);
 
+  // posts (creación base)
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS posts (
       id TEXT PRIMARY KEY NOT NULL,
       user_id TEXT NOT NULL,
       body TEXT,
       repost_of TEXT,
-      created_at TEXT DEFAULT (datetime('now')),
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
   `);
+
+  // --- migraciones condicionales para 'posts' ---
+  // (si la tabla ya existía con columnas faltantes)
+  if (!(await columnExists(db, 'posts', 'body'))) {
+    await db.runAsync(`ALTER TABLE posts ADD COLUMN body TEXT;`);
+  }
+  if (!(await columnExists(db, 'posts', 'repost_of'))) {
+    await db.runAsync(`ALTER TABLE posts ADD COLUMN repost_of TEXT;`);
+  }
+  if (!(await columnExists(db, 'posts', 'created_at'))) {
+    await db.runAsync(`ALTER TABLE posts ADD COLUMN created_at TEXT;`);
+    await db.runAsync(`UPDATE posts SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL;`);
+  }
 
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS post_media (
@@ -42,7 +60,7 @@ async function ensureTables() {
       post_id TEXT NOT NULL,
       uri TEXT NOT NULL,
       type TEXT DEFAULT 'image',
-      created_at TEXT DEFAULT (datetime('now')),
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (post_id) REFERENCES posts(id)
     );
   `);
@@ -51,7 +69,7 @@ async function ensureTables() {
     CREATE TABLE IF NOT EXISTS likes (
       user_id TEXT NOT NULL,
       post_id TEXT NOT NULL,
-      created_at TEXT DEFAULT (datetime('now')),
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (user_id, post_id),
       FOREIGN KEY (user_id) REFERENCES users(id),
       FOREIGN KEY (post_id) REFERENCES posts(id)
@@ -62,104 +80,12 @@ async function ensureTables() {
     CREATE TABLE IF NOT EXISTS saved_posts (
       user_id TEXT NOT NULL,
       post_id TEXT NOT NULL,
-      saved_at TEXT DEFAULT (datetime('now')),
+      saved_at TEXT DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (user_id, post_id),
       FOREIGN KEY (user_id) REFERENCES users(id),
       FOREIGN KEY (post_id) REFERENCES posts(id)
     );
   `);
-}
-
-function simpleId(prefix = 'p_') {
-  return prefix + Math.random().toString(36).slice(2) + Date.now().toString(36);
-}
-
-export async function createPost({ userId, body, mediaUris = [] }) {
-  await ensureTables();
-  const db = await getDb();
-  if (!userId || (!body && mediaUris.length === 0)) {
-    const e = new Error('missing-fields'); e.code = 'missing-fields'; throw e;
-  }
-
-  const author = await db.getFirstAsync(`SELECT id FROM users WHERE id = ?`, [userId]);
-  if (!author) { const e = new Error('author-not-found'); e.code = 'author-not-found'; throw e; }
-
-  const id = simpleId();
-  await db.runAsync(`INSERT INTO posts (id, user_id, body, repost_of) VALUES (?, ?, ?, NULL)`, [id, userId, body || null]);
-
-  const uris = Array.isArray(mediaUris) ? mediaUris.slice(0, 4) : [];
-  for (const uri of uris) {
-    await db.runAsync(`INSERT INTO post_media (post_id, uri, type) VALUES (?, ?, 'image')`, [id, uri]);
-  }
-
-  return id;
-}
-
-export async function toggleRepost({ userId, targetPostId }) {
-  await ensureTables();
-  const db = await getDb();
-
-  const t = await db.getFirstAsync(`SELECT id FROM posts WHERE id = ?`, [targetPostId]);
-  if (!t) { const e = new Error('original-not-found'); e.code = 'original-not-found'; throw e; }
-
-  const mine = await db.getFirstAsync(
-    `SELECT id FROM posts WHERE user_id = ? AND repost_of = ?`,
-    [userId, targetPostId]
-  );
-
-  let reposted;
-  if (mine) {
-    await db.runAsync(`DELETE FROM posts WHERE id = ?`, [mine.id]);
-    reposted = false;
-  } else {
-    const id = simpleId('rp_');
-    await db.runAsync(
-      `INSERT INTO posts (id, user_id, body, repost_of) VALUES (?, ?, NULL, ?)`,
-      [id, userId, targetPostId]
-    );
-    reposted = true;
-  }
-
-  const countRow = await db.getFirstAsync(`SELECT COUNT(*) AS n FROM posts WHERE repost_of = ?`, [targetPostId]);
-  return { reposted, reposts: Number(countRow?.n || 0) };
-}
-
-export async function toggleLike({ userId, postId }) {
-  await ensureTables();
-  const db = await getDb();
-
-  const like = await db.getFirstAsync(`SELECT 1 FROM likes WHERE user_id = ? AND post_id = ?`, [userId, postId]);
-
-  let liked;
-  if (like) {
-    await db.runAsync(`DELETE FROM likes WHERE user_id = ? AND post_id = ?`, [userId, postId]);
-    liked = false;
-  } else {
-    await db.runAsync(`INSERT INTO likes (user_id, post_id) VALUES (?, ?)`, [userId, postId]);
-    liked = true;
-  }
-
-  const countRow = await db.getFirstAsync(`SELECT COUNT(*) AS n FROM likes WHERE post_id = ?`, [postId]);
-  return { liked, likes: Number(countRow?.n || 0) };
-}
-
-export async function toggleSave({ userId, postId }) {
-  await ensureTables();
-  const db = await getDb();
-
-  const saved = await db.getFirstAsync(`SELECT 1 FROM saved_posts WHERE user_id = ? AND post_id = ?`, [userId, postId]);
-
-  let isSaved;
-  if (saved) {
-    await db.runAsync(`DELETE FROM saved_posts WHERE user_id = ? AND post_id = ?`, [userId, postId]);
-    isSaved = false;
-  } else {
-    await db.runAsync(`INSERT INTO saved_posts (user_id, post_id) VALUES (?, ?)`, [userId, postId]);
-    isSaved = true;
-  }
-
-  const countRow = await db.getFirstAsync(`SELECT COUNT(*) AS n FROM saved_posts WHERE post_id = ?`, [postId]);
-  return { saved: isSaved, saves: Number(countRow?.n || 0) };
 }
 
 function toArrayFromGroupConcat(str) {
@@ -207,9 +133,114 @@ function mapFeedRow(r) {
   };
 }
 
+export async function createPost({ userId, body, mediaUris = [] }) {
+  await ensureTables();
+  const db = await getDB();
+  if (!userId || (!body && mediaUris.length === 0)) {
+    const e = new Error('missing-fields'); e.code = 'missing-fields'; throw e;
+  }
+
+  const author = await db.getFirstAsync(`SELECT id FROM users WHERE id = ?`, [userId]);
+  if (!author) { const e = new Error('author-not-found'); e.code = 'author-not-found'; throw e; }
+
+  const id = simpleId();
+  await db.runAsync(
+    `INSERT INTO posts (id, user_id, body, repost_of, created_at)
+     VALUES (?, ?, ?, NULL, CURRENT_TIMESTAMP)`,
+    [id, userId, body || null]
+  );
+
+  const uris = Array.isArray(mediaUris) ? mediaUris.slice(0, 4) : [];
+  for (const uri of uris) {
+    await db.runAsync(
+      `INSERT INTO post_media (post_id, uri, type, created_at)
+       VALUES (?, ?, 'image', CURRENT_TIMESTAMP)`,
+      [id, uri]
+    );
+  }
+
+  return id;
+}
+
+export async function toggleRepost({ userId, targetPostId }) {
+  await ensureTables();
+  const db = await getDB();
+
+  const t = await db.getFirstAsync(`SELECT id FROM posts WHERE id = ?`, [targetPostId]);
+  if (!t) { const e = new Error('original-not-found'); e.code = 'original-not-found'; throw e; }
+
+  const mine = await db.getFirstAsync(
+    `SELECT id FROM posts WHERE user_id = ? AND repost_of = ?`,
+    [userId, targetPostId]
+  );
+
+  let reposted;
+  if (mine) {
+    await db.runAsync(`DELETE FROM posts WHERE id = ?`, [mine.id]);
+    reposted = false;
+  } else {
+    const id = simpleId('rp_');
+    await db.runAsync(
+      `INSERT INTO posts (id, user_id, body, repost_of, created_at)
+       VALUES (?, ?, NULL, ?, CURRENT_TIMESTAMP)`,
+      [id, userId, targetPostId]
+    );
+    reposted = true;
+  }
+
+  const countRow = await db.getFirstAsync(`SELECT COUNT(*) AS n FROM posts WHERE repost_of = ?`, [targetPostId]);
+  return { reposted, reposts: Number(countRow?.n || 0) };
+}
+
+export async function toggleLike({ userId, postId }) {
+  await ensureTables();
+  const db = await getDB();
+
+  const like = await db.getFirstAsync(`SELECT 1 FROM likes WHERE user_id = ? AND post_id = ?`, [userId, postId]);
+
+  let liked;
+  if (like) {
+    await db.runAsync(`DELETE FROM likes WHERE user_id = ? AND post_id = ?`, [userId, postId]);
+    liked = false;
+  } else {
+    await db.runAsync(
+      `INSERT INTO likes (user_id, post_id, created_at)
+       VALUES (?, ?, CURRENT_TIMESTAMP)`,
+      [userId, postId]
+    );
+    liked = true;
+  }
+
+  const countRow = await db.getFirstAsync(`SELECT COUNT(*) AS n FROM likes WHERE post_id = ?`, [postId]);
+  return { liked, likes: Number(countRow?.n || 0) };
+}
+
+export async function toggleSave({ userId, postId }) {
+  await ensureTables();
+  const db = await getDB();
+
+  const saved = await db.getFirstAsync(`SELECT 1 FROM saved_posts WHERE user_id = ? AND post_id = ?`, [userId, postId]);
+
+  let isSaved;
+  if (saved) {
+    await db.runAsync(`DELETE FROM saved_posts WHERE user_id = ? AND post_id = ?`, [userId, postId]);
+    isSaved = false;
+  } else {
+    await db.runAsync(
+      `INSERT INTO saved_posts (user_id, post_id, saved_at)
+       VALUES (?, ?, CURRENT_TIMESTAMP)`,
+      [userId, postId]
+    );
+    isSaved = true;
+  }
+
+  const countRow = await db.getFirstAsync(`SELECT COUNT(*) AS n FROM saved_posts WHERE post_id = ?`, [postId]);
+  return { saved: isSaved, saves: Number(countRow?.n || 0) };
+}
+
 export async function listFeedPosts({ limit = 30, offset = 0, currentUserId = '' } = {}) {
   await ensureTables();
-  const db = await getDb();
+  const db = await getDB();
 
   const rows = await db.getAllAsync(
     `
@@ -249,7 +280,7 @@ export async function listFeedPosts({ limit = 30, offset = 0, currentUserId = ''
 
 export async function listUserPosts({ userId, limit = 30, offset = 0, currentUserId = '' }) {
   await ensureTables();
-  const db = await getDb();
+  const db = await getDB();
   const rows = await db.getAllAsync(
     `
     SELECT
@@ -271,12 +302,12 @@ export async function listUserPosts({ userId, limit = 30, offset = 0, currentUse
     `,
     [currentUserId, currentUserId, userId, limit, offset]
   );
-  return rows.map((r) => mapFeedRow({ ...r, original_id: null })); // fuerza no-repost
+  return rows.map((r) => mapFeedRow({ ...r, original_id: null }));
 }
 
 export async function listUserReposts({ userId, limit = 30, offset = 0, currentUserId = '' }) {
   await ensureTables();
-  const db = await getDb();
+  const db = await getDB();
   const rows = await db.getAllAsync(
     `
     SELECT
@@ -315,7 +346,7 @@ export async function listUserReposts({ userId, limit = 30, offset = 0, currentU
 
 export async function listSavedPosts({ userId, limit = 50, offset = 0, currentUserId = '' }) {
   await ensureTables();
-  const db = await getDb();
+  const db = await getDB();
   const rows = await db.getAllAsync(
     `
     SELECT

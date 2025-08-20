@@ -1,80 +1,48 @@
 // src/components/home/SavedPostsScreen.jsx
-import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
-import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
-import { auth, db } from '../../firebaseConfig';
-import { PostItem } from './PostComponent';
-import { colors } from '../global/colors';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, FlatList, RefreshControl } from 'react-native';
+import { listSavedPosts } from '../../db/posts';
+import { getCurrentUserId } from '../../db/auth';
+import PostComponent from './PostComponent';
 
 export default function SavedPostsScreen() {
-  const [savedPosts, setSavedPosts] = useState([]);
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const fetchSavedPosts = async () => {
+  const load = useCallback(async () => {
     try {
-      const user = auth.currentUser;
-      if (!user) return;
-
-      // Suponiendo que guardás los IDs de los posts guardados en /users/{uid}/savedPosts/{postId}
-      const savedRef = collection(db, 'users', user.uid, 'savedPosts');
-      const savedSnap = await getDocs(savedRef);
-      const savedIds = savedSnap.docs.map(doc => doc.id);
-
-      const postPromises = savedIds.map(async (postId) => {
-        const postDoc = await getDoc(doc(db, 'posts', postId));
-        return postDoc.exists() ? { id: postDoc.id, ...postDoc.data() } : null;
-      });
-
-      const posts = (await Promise.all(postPromises)).filter(p => p !== null);
-      setSavedPosts(posts);
-    } catch (error) {
-      console.log('❌ Error al traer guardados:', error);
+      setLoading(true);
+      const uid = await getCurrentUserId();
+      if (!uid) { setItems([]); return; }
+      const rows = await listSavedPosts({ userId: uid, currentUserId: uid, limit: 100, offset: 0 });
+      setItems(rows);
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchSavedPosts();
   }, []);
 
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.PRIMARIO} />
-      </View>
-    );
-  }
+  useEffect(() => { load(); }, [load]);
 
-  if (savedPosts.length === 0) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.emptyText}>No guardaste ningún post todavía.</Text>
-      </View>
-    );
-  }
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
 
   return (
-    <FlatList
-      data={savedPosts}
-      keyExtractor={(item) => item.id}
-      renderItem={({ item }) => <PostItem post={item} />}
-      contentContainerStyle={{ paddingBottom: 100 }}
-    />
+    <View style={{ flex: 1 }}>
+      <FlatList
+        data={items}
+        keyExtractor={(it) => it.id}
+        renderItem={({ item }) => (
+          <PostComponent post={item} onChanged={load} />
+        )}
+        contentContainerStyle={{ paddingBottom: 20 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        onEndReachedThreshold={0.5}
+        ListEmptyComponent={!loading ? null : null}
+      />
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  center: {
-    flex: 1,
-    backgroundColor: colors.FONDO,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyText: {
-    color: colors.TEXTO_SECUNDARIO,
-    fontSize: 16,
-    textAlign: 'center',
-  },
-});
