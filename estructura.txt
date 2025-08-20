@@ -1,0 +1,30 @@
+src
+├── components
+│   ├── auth
+│   │   └── AuthScreen.jsx
+│   ├── global
+│   │   └── colors.js
+│   ├── Header.jsx
+│   ├── home
+│   │   ├── GuardedHome.jsx
+│   │   ├── Home.jsx
+│   │   ├── PostComponent.jsx
+│   │   └── SavedPostsScreen.jsx
+│   └── profile
+│       ├── ProfileSetupScreen.jsx
+│       └── UserProfileScreen.jsx
+├── db
+│   ├── auth.jsx
+│   ├── database.js
+│   └── posts.js
+├── firebaseConfig.js
+├── navigation
+│   ├── DrawerNavigator.jsx
+│   └── navigationRef.js
+└── redux
+    ├── services
+    │   └── postsApi.js
+    ├── store.js
+    └── userSlice.js
+
+10 directories, 18 files

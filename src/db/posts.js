@@ -11,6 +11,51 @@ async function columnExists(db, table, col) {
   return rows.some((r) => r.name === col);
 }
 
+async function rebuildPostsTable(db) {
+  await db.execAsync('BEGIN TRANSACTION;');
+  try {
+    // Esquema definitivo
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS posts_new (
+        id TEXT PRIMARY KEY NOT NULL,
+        user_id TEXT NOT NULL,
+        body TEXT,
+        repost_of TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      );
+    `);
+
+    // Copio lo que exista en la vieja
+    const cols = await db.getAllAsync(`PRAGMA table_info(posts);`);
+    const names = cols.map(c => c.name);
+    const hasId = names.includes('id');
+    const hasUser = names.includes('user_id');
+    const hasRepost = names.includes('repost_of');
+    const hasCreated = names.includes('created_at');
+
+    if (hasId && hasUser) {
+      await db.execAsync(`
+        INSERT INTO posts_new (id, user_id, body, repost_of, created_at)
+        SELECT
+          id,
+          user_id,
+          NULL AS body,
+          ${hasRepost ? 'repost_of' : 'NULL'} AS repost_of,
+          ${hasCreated ? 'created_at' : 'CURRENT_TIMESTAMP'} AS created_at
+        FROM posts;
+      `);
+    }
+
+    await db.execAsync(`DROP TABLE posts;`);
+    await db.execAsync(`ALTER TABLE posts_new RENAME TO posts;`);
+    await db.execAsync('COMMIT;');
+  } catch (e) {
+    await db.execAsync('ROLLBACK;');
+    throw e;
+  }
+}
+
 async function ensureTables() {
   const db = await getDB();
   await db.execAsync(`PRAGMA foreign_keys = ON;`);
@@ -29,7 +74,7 @@ async function ensureTables() {
     );
   `);
 
-  // posts (creación base)
+  // Crear posts si no existe (con el esquema correcto)
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS posts (
       id TEXT PRIMARY KEY NOT NULL,
@@ -41,17 +86,19 @@ async function ensureTables() {
     );
   `);
 
-  // --- migraciones condicionales para 'posts' ---
-  // (si la tabla ya existía con columnas faltantes)
-  if (!(await columnExists(db, 'posts', 'body'))) {
-    await db.runAsync(`ALTER TABLE posts ADD COLUMN body TEXT;`);
-  }
-  if (!(await columnExists(db, 'posts', 'repost_of'))) {
-    await db.runAsync(`ALTER TABLE posts ADD COLUMN repost_of TEXT;`);
-  }
-  if (!(await columnExists(db, 'posts', 'created_at'))) {
-    await db.runAsync(`ALTER TABLE posts ADD COLUMN created_at TEXT;`);
-    await db.runAsync(`UPDATE posts SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL;`);
+  // Si posts existe pero le falta 'body', reconstruyo
+  const hasBody = await columnExists(db, 'posts', 'body');
+  if (!hasBody) {
+    await rebuildPostsTable(db);
+  } else {
+    // “por si acaso”: columnas accesorias
+    if (!(await columnExists(db, 'posts', 'repost_of'))) {
+      await db.runAsync(`ALTER TABLE posts ADD COLUMN repost_of TEXT;`);
+    }
+    if (!(await columnExists(db, 'posts', 'created_at'))) {
+      await db.runAsync(`ALTER TABLE posts ADD COLUMN created_at TEXT;`);
+      await db.runAsync(`UPDATE posts SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL;`);
+    }
   }
 
   await db.execAsync(`
