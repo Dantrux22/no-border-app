@@ -5,7 +5,7 @@ import {
   ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useDispatch } from 'react-redux';
-import { useNavigation, CommonActions, DrawerActions } from '@react-navigation/native';
+import { useNavigation, CommonActions } from '@react-navigation/native';
 import { colors } from '../global/colors';
 import { setUser } from '../../redux/userSlice';
 import {
@@ -14,6 +14,7 @@ import {
   isProfileCompleted,
   getCurrentUserId,
 } from '../../db/auth';
+import { navigationRef } from '../../navigation/navigationRef';
 
 function friendly(e) {
   const code = e?.code || '';
@@ -39,16 +40,26 @@ export default function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
 
-  // Helper compatible con Drawer (jumpTo) + fallback navigate
+  // ✅ Navegación segura SIN reset para evitar el warning “not handled”
   const resetTo = (name, params) => {
-    try {
-      navigation.dispatch(DrawerActions.jumpTo(name, params));
+    // 1) Si el contenedor raíz está listo, navegamos desde root
+    if (navigationRef?.isReady?.()) {
+      navigationRef.navigate(name, params);
       return;
-    } catch (_) {
-      // ignore
     }
-    // Fallback por si no hay Drawer como parent
-    navigation.dispatch(CommonActions.navigate({ name, params }));
+    // 2) Fallback: navegar con el navigator del screen
+    try {
+      navigation.navigate(name, params);
+      return;
+    } catch {
+      // 3) Ultra-fallback: dispatch navigate (nunca resetea)
+      navigation.dispatch(
+        CommonActions.navigate({
+          name,
+          params,
+        })
+      );
+    }
   };
 
   // Si ya hay sesión al montar, redirigir según estado de perfil
@@ -67,7 +78,8 @@ export default function AuthScreen() {
         /* no-op */
       }
     })();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const onSignup = async () => {
     const email = signupEmail.trim();

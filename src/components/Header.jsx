@@ -17,6 +17,10 @@ import {
   useUnfollowMutation,
 } from '../redux/services/firebaseApi';
 
+// 👇 NUEVO: Auth anónima (Firebase) + contador RTDB
+import { ensureFirebaseAuth } from '../firebaseAuth';
+import { bumpSupporters } from '../firebaseRtdb';
+
 export default function Header() {
   const dispatch = useDispatch();
   const user = useSelector((s) => s.user?.currentUser);
@@ -73,20 +77,27 @@ export default function Header() {
   };
 
   const onToggleFollow = useCallback(async () => {
+    // 👇 asegura usuario Firebase (anónimo) para cumplir reglas sin tocar tu login SQLite
+    await ensureFirebaseAuth();
+
     if (!uid) {
       closeMenu();
-      goNested('Auth'); // pedimos login local (tu flujo SQLite) para contar el apoyo por usuario
+      goNested('Auth'); // pedimos login local para asociar el apoyo a tu usuario SQLite
       return;
     }
     try {
-      if (me) await unfollow({ uid }).unwrap();
-      else    await follow({ uid }).unwrap();
-      // RTK invalidates y actualiza; refetch opcional:
+      if (me) {
+        await unfollow({ uid }).unwrap();  // Firestore
+        await bumpSupporters(-1);          // RTDB
+      } else {
+        await follow({ uid }).unwrap();    // Firestore
+        await bumpSupporters(+1);          // RTDB
+      }
+      // RTK invalida y refresca; refetch opcional
       // await refetch();
     } catch (e) {
       console.log('❌ followers toggle error:', e);
-      // Si hubo error de Firestore, permitimos reintentar tocando el item
-      refetch();
+      refetch(); // reintento rápido
     }
   }, [uid, me, follow, unfollow, refetch]);
 
