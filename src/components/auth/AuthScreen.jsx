@@ -5,7 +5,7 @@ import {
   ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useDispatch } from 'react-redux';
-import { useNavigation, CommonActions } from '@react-navigation/native';
+import { useNavigation, CommonActions, DrawerActions } from '@react-navigation/native';
 import { colors } from '../global/colors';
 import { setUser } from '../../redux/userSlice';
 import {
@@ -39,10 +39,17 @@ export default function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
 
-  const resetTo = (name, params) =>
-    navigation.dispatch(
-      CommonActions.reset({ index: 0, routes: [{ name, params }] })
-    );
+  // Helper compatible con Drawer (jumpTo) + fallback navigate
+  const resetTo = (name, params) => {
+    try {
+      navigation.dispatch(DrawerActions.jumpTo(name, params));
+      return;
+    } catch (_) {
+      // ignore
+    }
+    // Fallback por si no hay Drawer como parent
+    navigation.dispatch(CommonActions.navigate({ name, params }));
+  };
 
   // Si ya hay sesión al montar, redirigir según estado de perfil
   useEffect(() => {
@@ -72,7 +79,7 @@ export default function AuthScreen() {
     try {
       const user = await registerUser({ email, password, username });
       dispatch(setUser(user));
-      // Onboarding: ir a configurar perfil en el mismo Drawer
+      // Onboarding: ir a configurar perfil
       resetTo('ProfileSetup', { userId: user.id });
     } catch (e) {
       console.log('❌ signup sqlite error:', e);
@@ -196,7 +203,7 @@ export default function AuthScreen() {
   );
 }
 
-/* Estilos que pediste mantener */
+/* Estilos: SIN CAMBIOS */
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.FONDO, alignItems: 'center', justifyContent: 'center', padding: 16 },
   card: { width: '100%', maxWidth: 420, gap: 12 },
