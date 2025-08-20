@@ -26,16 +26,17 @@ export default function DrawerNavigator() {
       />
 
       {/* Home protegido: envía a ProfileSetup si el perfil no está completo */}
-      <Drawer.Screen name="Home" component={GuardedHome} options={{ title: 'Inicio' }} />
+      <Drawer.Screen
+        name="Home"
+        component={GuardedHome}
+        options={{ title: 'Inicio' }}
+      />
 
       {/* Perfil visible */}
-      <Drawer.Screen name="UserProfile" component={UserProfileScreen} options={{ title: 'Perfil' }} />
-
-      {/* Alias oculto por si en algún lado navegas a 'Profile' */}
       <Drawer.Screen
-        name="Profile"
+        name="UserProfile"
         component={UserProfileScreen}
-        options={{ drawerItemStyle: { display: 'none' }, headerShown: false }}
+        options={{ title: 'Perfil' }}
       />
 
       {/* Configurar perfil (oculto) */}

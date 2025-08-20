@@ -1,16 +1,20 @@
 // src/firebaseConfig.js
-import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { initializeApp } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
 
-// ⚡ Usa tus credenciales reales de Firebase
+// Config provista por vos
 const firebaseConfig = {
-  apiKey: "TU_API_KEY",
-  authDomain: "TU_AUTH_DOMAIN",
-  projectId: "TU_PROJECT_ID",
-  storageBucket: "TU_STORAGE_BUCKET",
-  messagingSenderId: "TU_SENDER_ID",
-  appId: "TU_APP_ID",
+  apiKey: 'AIzaSyAYEs940csQs3OoiNpXQ3D-Q8YvZQVg4Xk',
+  authDomain: 'no-border-app.firebaseapp.com',
+  projectId: 'no-border-app',
+  storageBucket: 'no-border-app.firebasestorage.app',
+  messagingSenderId: '189028890663',
+  appId: '1:189028890663:web:08aed1f6dec9c10e07f602',
 };
 
 const app = initializeApp(firebaseConfig);
+
+// Firestore exportado para usar desde RTK Query
 export const db = getFirestore(app);
+
+export default app;

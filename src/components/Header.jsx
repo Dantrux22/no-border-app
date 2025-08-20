@@ -1,5 +1,5 @@
 // src/components/Header.jsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Image, TouchableOpacity,
   Platform, StatusBar, Modal
@@ -8,12 +8,20 @@ import { useSelector, useDispatch } from 'react-redux';
 import { colors } from './global/colors';
 import { navigationRef } from '../navigation/navigationRef';
 import { clearUser } from '../redux/userSlice';
-import { logoutUser } from '../db/auth'; // 👈 añadido: limpia la sesión en SQLite
+import { logoutUser } from '../db/auth';
+
+// Firestore RTK Query (seguidores No Border)
+import {
+  useGetFollowStatsQuery,
+  useFollowMutation,
+  useUnfollowMutation,
+} from '../redux/services/firebaseApi';
 
 export default function Header() {
   const dispatch = useDispatch();
   const user = useSelector((s) => s.user?.currentUser);
 
+  const uid = user?.id || null;
   const username = user?.username || 'usuario';
   const avatarEmoji = user?.avatar || '🙂';
   const avatarUrl = user?.avatarUrl || null;
@@ -21,6 +29,14 @@ export default function Header() {
 
   const [menuVisible, setMenuVisible] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+
+  // followers: contador global + si yo sigo
+  const { data, isFetching, isError, refetch } = useGetFollowStatsQuery({ uid });
+  const [follow,   { isLoading: following }]  = useFollowMutation();
+  const [unfollow, { isLoading: unfollowing }] = useUnfollowMutation();
+
+  const me = !!data?.me;
+  const count = data?.count ?? 0;
 
   const safeTop = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 20;
   const HEADER_HEIGHT = 64;
@@ -32,11 +48,9 @@ export default function Header() {
   const goNested = (screenName) => {
     if (!navigationRef.isReady()) return;
     const rootNames = navigationRef.getRootState?.()?.routeNames || [];
-    // Si existe la pantalla dentro del Drawer montado bajo "App"
     if (rootNames.includes('App')) {
       navigationRef.navigate('App', { screen: screenName });
     } else {
-      // Caso viejo: Drawer como root
       navigationRef.navigate(screenName);
     }
   };
@@ -48,20 +62,40 @@ export default function Header() {
     if (loggingOut) return;
     setLoggingOut(true);
     try {
-      // 🔐 Limpia sesión persistida en SQLite
       await logoutUser();
-      // 🗑️ Limpia el estado global
       dispatch(clearUser());
     } catch (e) {
       console.log('❌ logout sqlite error:', e);
     } finally {
       setLoggingOut(false);
       closeMenu();
-      // La navegación a Auth/guardias la resolvés con GuardedHome;
-      // si quisieras forzar acá, podrías:
-      // navigationRef.navigate('Auth');
     }
   };
+
+  const onToggleFollow = useCallback(async () => {
+    if (!uid) {
+      closeMenu();
+      goNested('Auth'); // pedimos login local (tu flujo SQLite) para contar el apoyo por usuario
+      return;
+    }
+    try {
+      if (me) await unfollow({ uid }).unwrap();
+      else    await follow({ uid }).unwrap();
+      // RTK invalidates y actualiza; refetch opcional:
+      // await refetch();
+    } catch (e) {
+      console.log('❌ followers toggle error:', e);
+      // Si hubo error de Firestore, permitimos reintentar tocando el item
+      refetch();
+    }
+  }, [uid, me, follow, unfollow, refetch]);
+
+  const supportAction = isFetching ? 'Cargando…' : (isError ? 'Demostra tu apoyo' : (me ? 'Siguiendo' : 'Seguir'));
+  const supportSub    = isFetching
+    ? 'Obteniendo seguidores…'
+    : (isError ? 'No se pudo cargar • Tocar para reintentar' : `${count} seguidores`);
+
+  const supportDisabled = following || unfollowing || isFetching;
 
   return (
     <View style={[styles.safeArea, { paddingTop: safeTop }]}>
@@ -69,7 +103,7 @@ export default function Header() {
         <TouchableOpacity onPress={openMenu} style={styles.left} activeOpacity={0.7}>
           <View style={styles.avatar}>
             {isUrl ? (
-              <Image source={{ uri: avatarUrl }} style={styles.avatarImg} onError={() => { /* fallback se mantiene en emoji si querés manejarlo */ }} />
+              <Image source={{ uri: avatarUrl }} style={styles.avatarImg} />
             ) : (
               <Text style={styles.avatarEmoji}>{avatarEmoji}</Text>
             )}
@@ -115,6 +149,22 @@ export default function Header() {
               <Text style={styles.menuText}>{loggingOut ? 'Cerrando sesión…' : 'Cerrar sesión'}</Text>
               <Text style={styles.menuSub}>Salir de tu cuenta</Text>
             </TouchableOpacity>
+
+            {/* ─────────── NUEVO: apoyo No Border (al final del panel) ─────────── */}
+            <View style={styles.itemDivider} />
+
+            <TouchableOpacity
+              style={[styles.menuItem, supportDisabled && { opacity: 0.7 }]}
+              activeOpacity={0.7}
+              onPress={onToggleFollow}
+              disabled={supportDisabled && !isError} // si hay error: permitimos tocar para refetch
+            >
+              <Text style={styles.menuText}>Demostrar tu apoyo</Text>
+              <Text style={styles.menuSub}>
+                {supportAction} • {supportSub}
+              </Text>
+            </TouchableOpacity>
+            {/* ─────────────────────────────────────────────────────────────────── */}
 
             <View style={{ height: 16 }} />
           </View>
