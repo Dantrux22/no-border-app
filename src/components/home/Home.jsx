@@ -11,20 +11,16 @@ import PostComponent from './PostComponent';
 import { listFeedPosts, createPost } from '../../db/posts';
 import { colors } from '../global/colors';
 
-function PostComposer({ currentUser, onPosted }) {
-  const [mountedOnce] = useState(() => {
-    if (globalThis.__NB_COMPOSER__) return false;
-    globalThis.__NB_COMPOSER__ = true;
-    return true;
-  });
-  useEffect(() => () => { globalThis.__NB_COMPOSER__ = false; }, []);
-  if (!mountedOnce) return null;
+import MapView, { Marker } from 'react-native-maps';              
+import { pickUserLocationOnce } from '../../utils/location';       
 
+function PostComposer({ currentUser, onPosted }) {
   const [text, setText] = useState('');
   const [photos, setPhotos] = useState([]);
   const [sending, setSending] = useState(false);
+  const [location, setLocation] = useState(null);
 
-  const disabled = sending || !currentUser || (text.trim().length === 0 && photos.length === 0);
+  const disabled = sending || !currentUser || (text.trim().length === 0 && photos.length === 0 && !location);
 
   const addPhotos = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -50,16 +46,39 @@ function PostComposer({ currentUser, onPosted }) {
     }
   };
 
+  const addLocation = async () => {
+    try {
+      const loc = await pickUserLocationOnce(); 
+      if (!loc) {
+        Alert.alert('Ubicación', 'No se pudo obtener tu ubicación o no diste permisos.');
+        return;
+      }
+      setLocation(loc);
+    } catch (e) {
+      console.log('⚠️ Ubicación error:', e);
+      Alert.alert('Ubicación', 'Ocurrió un problema obteniendo tu ubicación.');
+    }
+  };
+
   const removePhoto = (uri) => setPhotos((p) => p.filter((u) => u !== uri));
+  const clearLocation = () => setLocation(null);
 
   const handlePost = async () => {
     if (disabled) return;
     try {
       setSending(true);
       const body = text.trim();
-      await createPost({ userId: currentUser.id, body, mediaUris: photos });
+      await createPost({
+        userId: currentUser.id,
+        body,
+        mediaUris: photos,
+        latitude: location?.latitude ?? null,
+        longitude: location?.longitude ?? null,
+        locationLabel: location?.label ?? null,
+      });
       setText('');
       setPhotos([]);
+      setLocation(null);
       onPosted?.();
     } catch (e) {
       console.log('❌ Error publicando post:', e);
@@ -82,7 +101,7 @@ function PostComposer({ currentUser, onPosted }) {
         onChangeText={setText}
       />
 
-      {photos.length > 0 && (
+      {(photos.length > 0 || location) && (
         <View style={composerStyles.grid}>
           {photos.map((uri) => (
             <View key={uri} style={composerStyles.thumbWrap}>
@@ -92,13 +111,51 @@ function PostComposer({ currentUser, onPosted }) {
               </TouchableOpacity>
             </View>
           ))}
+
+          {location && (
+            <View style={composerStyles.thumbWrap}>
+              <MapView
+                style={composerStyles.thumb}
+                pointerEvents="none"
+                initialRegion={{
+                  latitude: location.latitude,
+                  longitude: location.longitude,
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01,
+                }}
+              >
+                <Marker coordinate={{ latitude: location.latitude, longitude: location.longitude }} />
+              </MapView>
+              <TouchableOpacity style={composerStyles.thumbX} onPress={clearLocation}>
+                <Text style={{ color: '#000', fontWeight: '900' }}>×</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       )}
 
+      {location && (
+        <Text style={composerStyles.locHint} numberOfLines={2}>
+          📍 {location.label ? `Cerca de ${location.label}` : `${location.latitude.toFixed(3)}, ${location.longitude.toFixed(3)}`}
+        </Text>
+      )}
+
       <View style={composerStyles.row}>
-        <TouchableOpacity onPress={addPhotos} style={composerStyles.ghostBtn} activeOpacity={0.8}>
-          <Text style={composerStyles.ghostText}>Agregar fotos</Text>
-        </TouchableOpacity>
+        <View style={composerStyles.leftOptions}>
+          <TouchableOpacity onPress={addPhotos} style={composerStyles.ghostBtn} activeOpacity={0.8}>
+            <Text style={composerStyles.ghostText}>Agregar fotos</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={addLocation}
+            style={[composerStyles.ghostBtn, location && composerStyles.ghostActive]}
+            activeOpacity={0.8}
+          >
+            <Text style={[composerStyles.ghostText, location && composerStyles.ghostTextActive]}>
+              {location ? 'Ubicación lista' : 'Agregar ubicación'}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <TouchableOpacity
           style={[composerStyles.btn, disabled ? composerStyles.btnDisabled : composerStyles.btnPrimary]}
@@ -180,15 +237,22 @@ const composerStyles = StyleSheet.create({
   },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   thumbWrap: { width: TH, height: TH, borderRadius: 10, overflow: 'hidden', position: 'relative' },
-  thumb: { width: '100%', height: '100%' },
+  thumb: { width: '100%', height: '100%', borderRadius: 10 },
   thumbX: {
     position: 'absolute', top: 4, left: 4,
     backgroundColor: '#fff', borderRadius: 12, width: 24, height: 24,
     alignItems: 'center', justifyContent: 'center',
   },
+  locHint: { marginTop: 6, color: colors.TEXTO_SECUNDARIO, fontSize: 12 },
+
   row: { marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  leftOptions: { flexDirection: 'row', alignItems: 'center', gap: 8 }, // ← NUEVO
+
   ghostBtn: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: colors.PRIMARIO },
   ghostText: { color: colors.PRIMARIO, fontWeight: '700' },
+  ghostActive: { borderColor: '#1DB954' },
+  ghostTextActive: { color: '#1DB954' },
+
   btn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 10 },
   btnPrimary: { backgroundColor: colors.PRIMARIO },
   btnDisabled: { backgroundColor: '#2a2a2a' },

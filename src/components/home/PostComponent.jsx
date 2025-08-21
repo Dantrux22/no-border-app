@@ -137,7 +137,7 @@ export default function PostComponent({ post, currentUser, onChanged }) {
 
   const onRepost = useCallback(async () => {
     try {
-      const optimistic = { ...stats, repostedByMe: !stats.repostedByMe, reposts: stats.repostedByMe ? Math.max(0, stats.reposts - 1) : stats.reposts + 1 };
+      const optimistic = { ...stats, repostedByMe: !s.stats?.repostedByMe, reposts: stats.repostedByMe ? Math.max(0, stats.reposts - 1) : stats.reposts + 1 };
       setStats(optimistic);
       const res = await toggleRepost({ userId: currentUser?.id || '', targetPostId: targetId });
       setStats((s) => ({ ...s, repostedByMe: res.reposted, reposts: res.reposts }));
@@ -146,6 +146,9 @@ export default function PostComponent({ post, currentUser, onChanged }) {
       setStats((s) => ({ ...s, repostedByMe: !s.repostedByMe, reposts: Math.max(0, s.repostedByMe ? s.reposts + 1 : s.reposts - 1) }));
     }
   }, [stats, currentUser?.id, targetId, onChanged]);
+
+  const displayLocation = isRepost ? (post.original?.location || null) : (post.location || null);
+  const hasLocation = !!(displayLocation && (displayLocation.label || (displayLocation.latitude != null && displayLocation.longitude != null)));
 
   return (
     <View style={styles.card}>
@@ -168,6 +171,17 @@ export default function PostComponent({ post, currentUser, onChanged }) {
       )}
 
       <MediaGrid uris={mediaUris} />
+
+      {hasLocation && (
+        <View style={styles.locationRow}>
+          <Ionicons name="location-outline" size={14} style={{ marginRight: 6, color: colors.TEXTO_SECUNDARIO }} />
+          <Text style={styles.locationText} numberOfLines={1}>
+            {displayLocation.label
+              ? `Cerca de ${displayLocation.label}`
+              : `${Number(displayLocation.latitude).toFixed(3)}, ${Number(displayLocation.longitude).toFixed(3)}`}
+          </Text>
+        </View>
+      )}
 
       <View style={styles.actions}>
         <TouchableOpacity style={styles.actionBtn} onPress={onLike} activeOpacity={0.8}>
@@ -242,6 +256,9 @@ const styles = StyleSheet.create({
 
   repostTag: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFFFFF11', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   repostText: { color: colors.TEXTO_SECUNDARIO, fontSize: 12 },
+
+  locationRow: { marginTop: 8, flexDirection: 'row', alignItems: 'center' },
+  locationText: { color: colors.TEXTO_SECUNDARIO, fontSize: 12 },
 
   actions: { flexDirection: 'row', alignItems: 'center', gap: 18, marginTop: 10 },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 4 },

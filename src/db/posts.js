@@ -5,7 +5,6 @@ function simpleId(prefix = 'p_') {
   return prefix + Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-// ---- helpers de migración ----
 async function columnExists(db, table, col) {
   const rows = await db.getAllAsync(`PRAGMA table_info(${table});`);
   return rows.some((r) => r.name === col);
@@ -14,34 +13,42 @@ async function columnExists(db, table, col) {
 async function rebuildPostsTable(db) {
   await db.execAsync('BEGIN TRANSACTION;');
   try {
-    // Esquema definitivo
     await db.execAsync(`
       CREATE TABLE IF NOT EXISTS posts_new (
         id TEXT PRIMARY KEY NOT NULL,
         user_id TEXT NOT NULL,
         body TEXT,
         repost_of TEXT,
+        latitude REAL,
+        longitude REAL,
+        location_label TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id)
       );
     `);
 
-    // Copio lo que exista en la vieja
     const cols = await db.getAllAsync(`PRAGMA table_info(posts);`);
     const names = cols.map(c => c.name);
     const hasId = names.includes('id');
     const hasUser = names.includes('user_id');
+    const hasBody = names.includes('body');
     const hasRepost = names.includes('repost_of');
+    const hasLat = names.includes('latitude');
+    const hasLng = names.includes('longitude');
+    const hasLabel = names.includes('location_label');
     const hasCreated = names.includes('created_at');
 
     if (hasId && hasUser) {
       await db.execAsync(`
-        INSERT INTO posts_new (id, user_id, body, repost_of, created_at)
+        INSERT INTO posts_new (id, user_id, body, repost_of, latitude, longitude, location_label, created_at)
         SELECT
           id,
           user_id,
-          NULL AS body,
+          ${hasBody ? 'body' : 'NULL'} AS body,
           ${hasRepost ? 'repost_of' : 'NULL'} AS repost_of,
+          ${hasLat ? 'latitude' : 'NULL'} AS latitude,
+          ${hasLng ? 'longitude' : 'NULL'} AS longitude,
+          ${hasLabel ? 'location_label' : 'NULL'} AS location_label,
           ${hasCreated ? 'created_at' : 'CURRENT_TIMESTAMP'} AS created_at
         FROM posts;
       `);
@@ -60,7 +67,6 @@ async function ensureTables() {
   const db = await getDB();
   await db.execAsync(`PRAGMA foreign_keys = ON;`);
 
-  // Esquema de users compatible con auth.jsx
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY NOT NULL,
@@ -74,30 +80,40 @@ async function ensureTables() {
     );
   `);
 
-  // Crear posts si no existe (con el esquema correcto)
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS posts (
       id TEXT PRIMARY KEY NOT NULL,
       user_id TEXT NOT NULL,
       body TEXT,
       repost_of TEXT,
+      latitude REAL,
+      longitude REAL,
+      location_label TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
   `);
 
-  // Si posts existe pero le falta 'body', reconstruyo
   const hasBody = await columnExists(db, 'posts', 'body');
   if (!hasBody) {
     await rebuildPostsTable(db);
   } else {
-    // “por si acaso”: columnas accesorias
     if (!(await columnExists(db, 'posts', 'repost_of'))) {
       await db.runAsync(`ALTER TABLE posts ADD COLUMN repost_of TEXT;`);
     }
     if (!(await columnExists(db, 'posts', 'created_at'))) {
       await db.runAsync(`ALTER TABLE posts ADD COLUMN created_at TEXT;`);
       await db.runAsync(`UPDATE posts SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL;`);
+    }
+    // nuevas columnas de ubicación
+    if (!(await columnExists(db, 'posts', 'latitude'))) {
+      await db.runAsync(`ALTER TABLE posts ADD COLUMN latitude REAL;`);
+    }
+    if (!(await columnExists(db, 'posts', 'longitude'))) {
+      await db.runAsync(`ALTER TABLE posts ADD COLUMN longitude REAL;`);
+    }
+    if (!(await columnExists(db, 'posts', 'location_label'))) {
+      await db.runAsync(`ALTER TABLE posts ADD COLUMN location_label TEXT;`);
     }
   }
 
@@ -151,6 +167,12 @@ function mapFeedRow(r) {
   const savedByMe = Boolean(useOriginal ? r.original_saved_by_me : r.saved_by_me);
   const media = useOriginal ? toArrayFromGroupConcat(r.original_media_uris) : toArrayFromGroupConcat(r.media_uris);
 
+  const loc = {
+    latitude: useOriginal ? r.original_latitude : r.latitude,
+    longitude: useOriginal ? r.original_longitude : r.longitude,
+    label: useOriginal ? r.original_location_label : r.location_label,
+  };
+
   return {
     id: r.id,
     createdAt: r.created_at,
@@ -163,6 +185,7 @@ function mapFeedRow(r) {
     },
     body: useOriginal ? (r.original_body || '') : (r.body || ''),
     media,
+    location: (loc.latitude != null || loc.longitude != null || loc.label) ? loc : null,
     stats: { likes, reposts, saves, likedByMe, savedByMe },
     original: isRepost
       ? {
@@ -175,12 +198,23 @@ function mapFeedRow(r) {
             avatarUrl: r.original_author_avatar_url || null,
           },
           createdAt: r.original_created_at,
+          location:
+            (r.original_latitude != null || r.original_longitude != null || r.original_location_label)
+              ? { latitude: r.original_latitude, longitude: r.original_longitude, label: r.original_location_label }
+              : null,
         }
       : null,
   };
 }
 
-export async function createPost({ userId, body, mediaUris = [] }) {
+export async function createPost({
+  userId,
+  body,
+  mediaUris = [],
+  latitude = null,
+  longitude = null,
+  locationLabel = null,
+}) {
   await ensureTables();
   const db = await getDB();
   if (!userId || (!body && mediaUris.length === 0)) {
@@ -192,9 +226,9 @@ export async function createPost({ userId, body, mediaUris = [] }) {
 
   const id = simpleId();
   await db.runAsync(
-    `INSERT INTO posts (id, user_id, body, repost_of, created_at)
-     VALUES (?, ?, ?, NULL, CURRENT_TIMESTAMP)`,
-    [id, userId, body || null]
+    `INSERT INTO posts (id, user_id, body, repost_of, latitude, longitude, location_label, created_at)
+     VALUES (?, ?, ?, NULL, ?, ?, ?, CURRENT_TIMESTAMP)`,
+    [id, userId, body || null, latitude, longitude, locationLabel]
   );
 
   const uris = Array.isArray(mediaUris) ? mediaUris.slice(0, 4) : [];
@@ -293,6 +327,7 @@ export async function listFeedPosts({ limit = 30, offset = 0, currentUserId = ''
     `
     SELECT
       p.id, p.body, p.repost_of, p.created_at,
+      p.latitude, p.longitude, p.location_label,
       u.id AS author_id, u.username AS author_username, u.avatar AS author_avatar, u.avatar_url AS author_avatar_url,
 
       (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) AS likes_count,
@@ -303,6 +338,7 @@ export async function listFeedPosts({ limit = 30, offset = 0, currentUserId = ''
       (SELECT GROUP_CONCAT(uri, '||') FROM post_media WHERE post_id = p.id) AS media_uris,
 
       op.id AS original_id, op.body AS original_body, op.created_at AS original_created_at,
+      op.latitude AS original_latitude, op.longitude AS original_longitude, op.location_label AS original_location_label,
       ou.id AS original_author_id, ou.username AS original_author_username, ou.avatar AS original_author_avatar, ou.avatar_url AS original_author_avatar_url,
 
       (SELECT COUNT(*) FROM likes l2 WHERE l2.post_id = op.id) AS original_likes_count,
@@ -332,6 +368,7 @@ export async function listUserPosts({ userId, limit = 30, offset = 0, currentUse
     `
     SELECT
       p.id, p.body, p.repost_of, p.created_at,
+      p.latitude, p.longitude, p.location_label,
       u.id AS author_id, u.username AS author_username, u.avatar AS author_avatar, u.avatar_url AS author_avatar_url,
 
       (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) AS likes_count,
@@ -359,6 +396,7 @@ export async function listUserReposts({ userId, limit = 30, offset = 0, currentU
     `
     SELECT
       p.id, p.body, p.repost_of, p.created_at,
+      p.latitude, p.longitude, p.location_label,
       u.id AS author_id, u.username AS author_username, u.avatar AS author_avatar, u.avatar_url AS author_avatar_url,
 
       (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) AS likes_count,
@@ -369,6 +407,7 @@ export async function listUserReposts({ userId, limit = 30, offset = 0, currentU
       (SELECT GROUP_CONCAT(uri, '||') FROM post_media WHERE post_id = p.id) AS media_uris,
 
       op.id AS original_id, op.body AS original_body, op.created_at AS original_created_at,
+      op.latitude AS original_latitude, op.longitude AS original_longitude, op.location_label AS original_location_label,
       ou.id AS original_author_id, ou.username AS original_author_username, ou.avatar AS original_author_avatar, ou.avatar_url AS original_author_avatar_url,
 
       (SELECT COUNT(*) FROM likes l2 WHERE l2.post_id = op.id) AS original_likes_count,
@@ -398,6 +437,7 @@ export async function listSavedPosts({ userId, limit = 50, offset = 0, currentUs
     `
     SELECT
       p.id, p.body, p.repost_of, p.created_at,
+      p.latitude, p.longitude, p.location_label,
       u.id AS author_id, u.username AS author_username, u.avatar AS author_avatar, u.avatar_url AS author_avatar_url,
 
       (SELECT COUNT(*) FROM likes l WHERE l.post_id = p.id) AS likes_count,
@@ -408,6 +448,7 @@ export async function listSavedPosts({ userId, limit = 50, offset = 0, currentUs
       (SELECT GROUP_CONCAT(uri, '||') FROM post_media WHERE post_id = p.id) AS media_uris,
 
       op.id AS original_id, op.body AS original_body, op.created_at AS original_created_at,
+      op.latitude AS original_latitude, op.longitude AS original_longitude, op.location_label AS original_location_label,
       ou.id AS original_author_id, ou.username AS original_author_username, ou.avatar AS original_author_avatar, ou.avatar_url AS original_author_avatar_url,
       (SELECT GROUP_CONCAT(uri, '||') FROM post_media WHERE post_id = op.id) AS original_media_uris
 
