@@ -1,31 +1,34 @@
 // src/components/Header.jsx
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, Image, TouchableOpacity,
   Platform, StatusBar, Modal
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
+import { CommonActions, useNavigation } from '@react-navigation/native';
 import { colors } from './global/colors';
-import { navigationRef } from '../navigation/navigationRef';
 import { clearUser } from '../redux/userSlice';
 import { logoutUser } from '../db/auth';
 
-// Firestore RTK Query (seguidores No Border)
+// RTK Query followers
 import {
   useGetFollowStatsQuery,
   useFollowMutation,
   useUnfollowMutation,
 } from '../redux/services/firebaseApi';
 
-// 👇 NUEVO: Auth anónima (Firebase) + contador RTDB
+// Firebase Auth (para UID anónimo)
 import { ensureFirebaseAuth } from '../firebaseAuth';
+import { getAuth } from 'firebase/auth';
+
+// Contador global en RTDB
 import { bumpSupporters } from '../firebaseRtdb';
 
 export default function Header() {
   const dispatch = useDispatch();
+  const navigation = useNavigation();
   const user = useSelector((s) => s.user?.currentUser);
 
-  const uid = user?.id || null;
   const username = user?.username || 'usuario';
   const avatarEmoji = user?.avatar || '🙂';
   const avatarUrl = user?.avatarUrl || null;
@@ -34,13 +37,39 @@ export default function Header() {
   const [menuVisible, setMenuVisible] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  // followers: contador global + si yo sigo
-  const { data, isFetching, isError, refetch } = useGetFollowStatsQuery({ uid });
+  // ── UID Firebase para follow/unfollow (no confundir con SQLite)
+  const [firebaseUid, setFirebaseUid] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        await ensureFirebaseAuth(); // inicia anónimo si hace falta
+        const uid = getAuth().currentUser?.uid || null;
+        if (mounted) setFirebaseUid(uid);
+      } catch (e) {
+        console.log('ensureFirebaseAuth error:', e);
+      } finally {
+        if (mounted) setAuthReady(true);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  // followers: lee contador y si "yo" sigo (según firebaseUid)
+  const {
+    data: followData,
+    isFetching,
+    isError,
+    refetch,
+  } = useGetFollowStatsQuery({ uid: firebaseUid }, { skip: !authReady });
+
   const [follow,   { isLoading: following }]  = useFollowMutation();
   const [unfollow, { isLoading: unfollowing }] = useUnfollowMutation();
 
-  const me = !!data?.me;
-  const count = data?.count ?? 0;
+  const me = !!followData?.me;          // ¿sigo a No Border?
+  const count = followData?.count ?? 0; // total seguidores
 
   const safeTop = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 20;
   const HEADER_HEIGHT = 64;
@@ -49,16 +78,7 @@ export default function Header() {
   const openMenu  = () => setMenuVisible(true);
   const closeMenu = () => setMenuVisible(false);
 
-  const goNested = (screenName) => {
-    if (!navigationRef.isReady()) return;
-    const rootNames = navigationRef.getRootState?.()?.routeNames || [];
-    if (rootNames.includes('App')) {
-      navigationRef.navigate('App', { screen: screenName });
-    } else {
-      navigationRef.navigate(screenName);
-    }
-  };
-
+  const goNested = (screenName) => navigation.navigate(screenName);
   const goHome    = () => { closeMenu(); goNested('Home'); };
   const goProfile = () => { closeMenu(); goNested('UserProfile'); };
 
@@ -71,42 +91,43 @@ export default function Header() {
     } catch (e) {
       console.log('❌ logout sqlite error:', e);
     } finally {
-      setLoggingOut(false);
       closeMenu();
+      navigation.closeDrawer?.();
+      navigation.dispatch(
+        CommonActions.reset({ index: 0, routes: [{ name: 'Auth' }] })
+      );
+      setLoggingOut(false);
     }
   };
 
   const onToggleFollow = useCallback(async () => {
-    // 👇 asegura usuario Firebase (anónimo) para cumplir reglas sin tocar tu login SQLite
-    await ensureFirebaseAuth();
-
+    try {
+      if (!getAuth().currentUser) await ensureFirebaseAuth();
+    } catch (e) {
+      console.log('ensureFirebaseAuth inline error:', e);
+    }
+    const uid = getAuth().currentUser?.uid || null;
     if (!uid) {
       closeMenu();
-      goNested('Auth'); // pedimos login local para asociar el apoyo a tu usuario SQLite
+      navigation.navigate('Auth');
       return;
     }
     try {
       if (me) {
-        await unfollow({ uid }).unwrap();  // Firestore
-        await bumpSupporters(-1);          // RTDB
+        await unfollow({ uid }).unwrap();     // borra app/noborder/followers/<uid>
+        await bumpSupporters(-1);             // RTDB --
       } else {
-        await follow({ uid }).unwrap();    // Firestore
-        await bumpSupporters(+1);          // RTDB
+        await follow({ uid }).unwrap();       // crea/mergea app/noborder/followers/<uid>
+        await bumpSupporters(+1);             // RTDB ++
       }
-      // RTK invalida y refresca; refetch opcional
-      // await refetch();
+      await refetch(); // refresca contador + "me"
     } catch (e) {
       console.log('❌ followers toggle error:', e);
-      refetch(); // reintento rápido
+      await refetch();
     }
-  }, [uid, me, follow, unfollow, refetch]);
+  }, [me, follow, unfollow, navigation, refetch, closeMenu]);
 
-  const supportAction = isFetching ? 'Cargando…' : (isError ? 'Demostra tu apoyo' : (me ? 'Siguiendo' : 'Seguir'));
-  const supportSub    = isFetching
-    ? 'Obteniendo seguidores…'
-    : (isError ? 'No se pudo cargar • Tocar para reintentar' : `${count} seguidores`);
-
-  const supportDisabled = following || unfollowing || isFetching;
+  const supportDisabled = following || unfollowing || isFetching || !authReady;
 
   return (
     <View style={[styles.safeArea, { paddingTop: safeTop }]}>
@@ -161,21 +182,42 @@ export default function Header() {
               <Text style={styles.menuSub}>Salir de tu cuenta</Text>
             </TouchableOpacity>
 
-            {/* ─────────── NUEVO: apoyo No Border (al final del panel) ─────────── */}
+            {/* ─────────── Seguinos (No Border) ─────────── */}
             <View style={styles.itemDivider} />
 
-            <TouchableOpacity
-              style={[styles.menuItem, supportDisabled && { opacity: 0.7 }]}
-              activeOpacity={0.7}
-              onPress={onToggleFollow}
-              disabled={supportDisabled && !isError} // si hay error: permitimos tocar para refetch
-            >
-              <Text style={styles.menuText}>Demostrar tu apoyo</Text>
-              <Text style={styles.menuSub}>
-                {supportAction} • {supportSub}
+            <View style={styles.followCard}>
+              <Text style={styles.followTitle}>✨ Seguinos (No Border)</Text>
+              <Text style={styles.followCount}>
+                {!authReady
+                  ? 'Preparando…'
+                  : isFetching
+                    ? 'Cargando…'
+                    : isError
+                      ? 'Sin conexión'
+                      : `${count} seguidores`}
               </Text>
-            </TouchableOpacity>
-            {/* ─────────────────────────────────────────────────────────────────── */}
+
+              <TouchableOpacity
+                style={[
+                  styles.followBtn,
+                  me ? styles.followingBtn : styles.notFollowingBtn,
+                  supportDisabled && { opacity: 0.7 },
+                ]}
+                activeOpacity={0.8}
+                onPress={onToggleFollow}
+                disabled={supportDisabled && !isError}
+              >
+                <Text style={styles.followBtnText}>
+                  {!authReady
+                    ? '...'
+                    : isFetching
+                      ? '...'
+                      : me
+                        ? 'Siguiendo'
+                        : 'Seguir'}
+                </Text>
+              </TouchableOpacity>
+            </View>
 
             <View style={{ height: 16 }} />
           </View>
@@ -219,4 +261,40 @@ const styles = StyleSheet.create({
   menuText: { color: colors.BLANCO, fontSize: 16, fontWeight: '600' },
   menuSub: { color: colors.TEXTO_SECUNDARIO, fontSize: 12, marginTop: 2 },
   dismissArea: { flex: 1 },
+
+  // ── Estilos del bloque "Seguinos"
+  followCard: {
+    backgroundColor: colors.FONDO,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  followTitle: {
+    color: colors.BLANCO,
+    fontWeight: '800',
+    fontSize: 16,
+    marginBottom: 4,
+  },
+  followCount: {
+    color: colors.TEXTO_SECUNDARIO,
+    fontSize: 13,
+    marginBottom: 10,
+  },
+  followBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+  },
+  notFollowingBtn: {
+    backgroundColor: colors.PRIMARIO,
+  },
+  followingBtn: {
+    backgroundColor: colors.GRIS_INTERMEDIO,
+  },
+  followBtnText: {
+    color: colors.BLANCO,
+    fontWeight: '700',
+    fontSize: 14,
+  },
 });

@@ -22,10 +22,14 @@ export default function DrawerNavigator() {
       <Drawer.Screen
         name="Auth"
         component={AuthScreen}
-        options={{ drawerItemStyle: { display: 'none' }, headerShown: false }}
+        options={{
+          headerShown: false,
+          drawerItemStyle: { display: 'none' },
+          swipeEnabled: false, // 👈 importante: no abrir drawer en Auth
+        }}
       />
 
-      {/* Home protegido: envía a ProfileSetup si el perfil no está completo */}
+      {/* Home protegido */}
       <Drawer.Screen
         name="Home"
         component={GuardedHome}
@@ -43,7 +47,11 @@ export default function DrawerNavigator() {
       <Drawer.Screen
         name="ProfileSetup"
         component={ProfileSetupScreen}
-        options={{ title: 'Configurar perfil', drawerItemStyle: { display: 'none' }, headerShown: false }}
+        options={{
+          title: 'Configurar perfil',
+          drawerItemStyle: { display: 'none' },
+          headerShown: false,
+        }}
       />
     </Drawer.Navigator>
   );

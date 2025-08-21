@@ -5,8 +5,18 @@ import {
   doc, collection, getDoc, setDoc, deleteDoc,
   serverTimestamp, getCountFromServer
 } from 'firebase/firestore';
+import { getAuth, signInAnonymously } from 'firebase/auth';
+import app from '../../firebaseConfig';
 
-// Estructura: app / noborder / followers / <uid>
+// Asegura sesión Firebase (anónima) — útil si el usuario no inició nada aún
+async function ensureFirebaseAuth() {
+  const { getAuth } = await import('firebase/auth');
+  const auth = getAuth(app);
+  if (!auth.currentUser) await signInAnonymously(auth);
+  return auth.currentUser;
+}
+
+// Estructura Firestore: app / noborder / followers / <uid>
 const ROOT_DOC = doc(db, 'app', 'noborder');
 const FOLLOWERS = collection(ROOT_DOC, 'followers');
 
@@ -15,16 +25,21 @@ export const firebaseApi = createApi({
   baseQuery: fakeBaseQuery(),
   tagTypes: ['Follow'],
   endpoints: (builder) => ({
-    // Lee contador total + si el usuario actual (uid) sigue o no
+    // Lee: total de seguidores + si YO sigo (me)
     getFollowStats: builder.query({
       async queryFn({ uid } = {}) {
         try {
+          // si no vino uid, garantizamos uno anónimo (para poder resolver "me")
+          const current = uid || (await ensureFirebaseAuth())?.uid || null;
+
+          // 1) contador (aggregate)
           const agg = await getCountFromServer(FOLLOWERS);
           const count = agg.data().count ?? 0;
 
+          // 2) me = existe doc app/noborder/followers/<uidFirebase> ?
           let me = false;
-          if (uid) {
-            const myDoc = await getDoc(doc(FOLLOWERS, uid));
+          if (current) {
+            const myDoc = await getDoc(doc(FOLLOWERS, current));
             me = myDoc.exists();
           }
 
@@ -36,32 +51,36 @@ export const firebaseApi = createApi({
       providesTags: [{ type: 'Follow', id: 'LIST' }],
     }),
 
-    // Seguir (crea/mergea doc del uid)
+    // Seguir: crea/mergea doc del UID Firebase
     follow: builder.mutation({
-      async queryFn({ uid }) {
+      async queryFn({ uid } = {}, { dispatch }) {
         try {
-          if (!uid) throw new Error('missing-uid');
-          await setDoc(doc(FOLLOWERS, uid), { since: serverTimestamp() }, { merge: true });
+          const current = uid || (await ensureFirebaseAuth())?.uid;
+          if (!current) throw new Error('missing-uid');
+          await setDoc(doc(FOLLOWERS, current), { since: serverTimestamp() }, { merge: true });
+          // invalidar lista para que refresque
+          dispatch(firebaseApi.util.invalidateTags([{ type: 'Follow', id: 'LIST' }]));
           return { data: { ok: true } };
         } catch (e) {
           return { error: { message: e?.message || 'firestore/follow failed' } };
         }
       },
-      invalidatesTags: [{ type: 'Follow', id: 'LIST' }],
     }),
 
-    // Dejar de seguir (borra doc del uid)
+    // Dejar de seguir: borra doc del UID Firebase
     unfollow: builder.mutation({
-      async queryFn({ uid }) {
+      async queryFn({ uid } = {}, { dispatch }) {
         try {
-          if (!uid) throw new Error('missing-uid');
-          await deleteDoc(doc(FOLLOWERS, uid));
+          const current = uid || (await ensureFirebaseAuth())?.uid;
+          if (!current) throw new Error('missing-uid');
+          await deleteDoc(doc(FOLLOWERS, current));
+          // invalidar lista para que refresque
+          dispatch(firebaseApi.util.invalidateTags([{ type: 'Follow', id: 'LIST' }]));
           return { data: { ok: true } };
         } catch (e) {
           return { error: { message: e?.message || 'firestore/unfollow failed' } };
         }
       },
-      invalidatesTags: [{ type: 'Follow', id: 'LIST' }],
     }),
   }),
 });

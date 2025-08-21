@@ -14,6 +14,8 @@ import DrawerNavigator from './src/navigation/DrawerNavigator';
 import AuthScreen from './src/components/auth/AuthScreen';
 
 import { getCurrentUserId, getUserById } from './src/db/auth';
+// 👇 Garantiza UID Firebase (una sola vez al boot)
+import { ensureFirebaseAuthOnce } from './src/firebaseAuth';
 
 const Stack = createNativeStackNavigator();
 
@@ -47,6 +49,10 @@ function Bootstrap() {
     let done = false;
     (async () => {
       try {
+        // UID Firebase para Firestore/RTDB
+        await ensureFirebaseAuthOnce();
+
+        // Bootstrap de sesión local (SQLite)
         const uid = await getCurrentUserId();
         if (uid) {
           const row = await getUserById(uid);

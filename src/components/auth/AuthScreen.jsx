@@ -14,7 +14,6 @@ import {
   isProfileCompleted,
   getCurrentUserId,
 } from '../../db/auth';
-import { navigationRef } from '../../navigation/navigationRef';
 
 function friendly(e) {
   const code = e?.code || '';
@@ -40,26 +39,25 @@ export default function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
 
-  // ✅ Navegación segura SIN reset para evitar el warning “not handled”
-  const resetTo = (name, params) => {
-    // 1) Si el contenedor raíz está listo, navegamos desde root
-    if (navigationRef?.isReady?.()) {
-      navigationRef.navigate(name, params);
-      return;
-    }
-    // 2) Fallback: navegar con el navigator del screen
-    try {
-      navigation.navigate(name, params);
-      return;
-    } catch {
-      // 3) Ultra-fallback: dispatch navigate (nunca resetea)
-      navigation.dispatch(
-        CommonActions.navigate({
-          name,
-          params,
-        })
-      );
-    }
+  /**
+   * ✅ Resetear la raíz del Stack hacia el Drawer ("App")
+   *    y abrir una screen interna del Drawer (Home/ProfileSetup).
+   */
+  const resetTo = (drawerScreenName, params) => {
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [
+          {
+            name: 'App', // <- Stack.Screen que monta el DrawerNavigator
+            state: {
+              index: 0,
+              routes: [{ name: drawerScreenName, params }],
+            },
+          },
+        ],
+      })
+    );
   };
 
   // Si ya hay sesión al montar, redirigir según estado de perfil
@@ -215,7 +213,7 @@ export default function AuthScreen() {
   );
 }
 
-/* Estilos: SIN CAMBIOS */
+/* Estilos */
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.FONDO, alignItems: 'center', justifyContent: 'center', padding: 16 },
   card: { width: '100%', maxWidth: 420, gap: 12 },
