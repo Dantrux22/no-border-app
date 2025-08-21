@@ -15,6 +15,8 @@ import AuthScreen from './src/components/auth/AuthScreen';
 import { getCurrentUserId, getUserById } from './src/db/auth';
 import { ensureFirebaseAuthOnce } from './src/firebaseAuth';
 
+import { plugAndPlayCloud } from './src/cloud/plugAndPlay';
+
 const Stack = createNativeStackNavigator();
 
 function Splash() {
@@ -41,9 +43,13 @@ function Bootstrap() {
 
   useEffect(() => {
     let done = false;
+    let stopCloud = null;
+
     (async () => {
       try {
         await ensureFirebaseAuthOnce();
+
+        stopCloud = plugAndPlayCloud({ dispatch }); 
 
         const uid = await getCurrentUserId();
         if (uid) {
@@ -68,7 +74,11 @@ function Bootstrap() {
     })();
 
     const t = setTimeout(() => { if (!done) setReady(true); }, 2000);
-    return () => clearTimeout(t);
+
+    return () => {
+      clearTimeout(t);
+      if (typeof stopCloud === 'function') stopCloud(); 
+    };
   }, [dispatch]);
 
   if (!ready) return <Splash />;

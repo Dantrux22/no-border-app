@@ -1,5 +1,5 @@
 // src/firebaseConfig.js
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -9,9 +9,10 @@ const firebaseConfig = {
   storageBucket: 'no-border-app.firebasestorage.app',
   messagingSenderId: '189028890663',
   appId: '1:189028890663:web:08aed1f6dec9c10e07f602',
-  databaseURL: 'https://no-border-app-default-rtdb.firebaseio.com', // <- importante
+  databaseURL: 'https://no-border-app-default-rtdb.firebaseio.com',
 };
 
-const app = initializeApp(firebaseConfig);
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+
 export const db = getFirestore(app);
 export default app;

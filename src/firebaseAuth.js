@@ -12,17 +12,12 @@ export function ensureFirebaseAuthOnce() {
   _readyPromise = new Promise((resolve) => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       unsub();
-
       if (user) return resolve(user); 
 
       try {
         const cred = await signInAnonymously(auth);
         return resolve(cred.user);
       } catch (e) {
-        const code = e?.code || '';
-        if (code === 'auth/operation-not-allowed' || code === 'auth/admin-restricted-operation') {
-          return resolve(null);
-        }
         return resolve(null);
       }
     });
@@ -36,11 +31,7 @@ export async function ensureFirebaseAuth() {
   try {
     const cred = await signInAnonymously(auth);
     return cred.user;
-  } catch (e) {
-    const code = e?.code || '';
-    if (code === 'auth/operation-not-allowed' || code === 'auth/admin-restricted-operation') {
-      return null;
-    }
+  } catch {
     return null;
   }
 }
