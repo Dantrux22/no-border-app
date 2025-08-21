@@ -10,16 +10,14 @@ import {
   markProfileCompleted,
 } from '../../db/auth';
 
-// Reset a Home usando el ref global (como venimos usando)
 import { resetToNested, navigate, isReady } from '../../navigation/navigationRef';
 
-// 🔥 nuevo helper de Storage
 import { uploadImageToStorage } from '../../firebaseStorage';
 
 const EMOJIS = ['🦊','🐨','🐯','🐸','🐵','🐶','🐱','🦁','🐼','🦄','🧑','👩','👨','🧔','👩‍🦰','👨‍🦱','👩‍🦳','👨‍🦲','👩‍🎨','🕵️‍♂️'];
 
 export default function ProfileSetupScreen() {
-  const [tab, setTab] = useState('emoji');   // 'emoji' | 'foto'
+  const [tab, setTab] = useState('emoji');   
   const [emoji, setEmoji] = useState(EMOJIS[0]);
   const [imageUri, setImageUri] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -30,9 +28,7 @@ export default function ProfileSetupScreen() {
     else navigate('App', { screen: 'Home' });
   };
 
-  // ----------- Cámara -----------
   const takePhoto = async () => {
-    // permiso de cámara
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
       return Alert.alert('Permiso requerido', 'Otorgá permisos de cámara para sacar una foto.');
@@ -40,14 +36,13 @@ export default function ProfileSetupScreen() {
     const result = await ImagePicker.launchCameraAsync({
       quality: 0.85,
       allowsEditing: true,
-      aspect: [1, 1], // cuadrado opcional
+      aspect: [1, 1], 
     });
     if (!result.canceled && result.assets?.length) {
       setImageUri(result.assets[0].uri);
     }
   };
 
-  // ----------- Galería -----------
   const pickFromGallery = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -77,7 +72,6 @@ export default function ProfileSetupScreen() {
     setSaving(true);
     try {
       if (tab === 'emoji') {
-        // Guardar emoji local (SQLite)
         await updateUserAvatar(uid, emoji);
         await updateUserAvatarUrl(uid, null);
       } else {
@@ -85,9 +79,8 @@ export default function ProfileSetupScreen() {
           setSaving(false);
           return Alert.alert('Elegí o tomá una foto primero.');
         }
-        // Subir a Storage y guardar downloadURL
         setUploading(true);
-        const path = `avatars/${uid}.jpg`; // podés versionar si querés: avatars/${uid}-${Date.now()}.jpg
+        const path = `avatars/${uid}.jpg`; 
         const url = await uploadImageToStorage(imageUri, path);
         setUploading(false);
 

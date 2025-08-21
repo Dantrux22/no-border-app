@@ -10,18 +10,15 @@ import { colors } from './global/colors';
 import { clearUser } from '../redux/userSlice';
 import { logoutUser } from '../db/auth';
 
-// RTK Query followers
 import {
   useGetFollowStatsQuery,
   useFollowMutation,
   useUnfollowMutation,
 } from '../redux/services/firebaseApi';
 
-// Firebase Auth (para UID anónimo)
 import { ensureFirebaseAuth } from '../firebaseAuth';
 import { getAuth } from 'firebase/auth';
 
-// Contador global en RTDB
 import { bumpSupporters } from '../firebaseRtdb';
 
 export default function Header() {
@@ -37,7 +34,6 @@ export default function Header() {
   const [menuVisible, setMenuVisible] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  // ── UID Firebase para follow/unfollow (no confundir con SQLite)
   const [firebaseUid, setFirebaseUid] = useState(null);
   const [authReady, setAuthReady] = useState(false);
 
@@ -45,7 +41,7 @@ export default function Header() {
     let mounted = true;
     (async () => {
       try {
-        await ensureFirebaseAuth(); // inicia anónimo si hace falta
+        await ensureFirebaseAuth(); 
         const uid = getAuth().currentUser?.uid || null;
         if (mounted) setFirebaseUid(uid);
       } catch (e) {
@@ -57,7 +53,6 @@ export default function Header() {
     return () => { mounted = false; };
   }, []);
 
-  // followers: lee contador y si "yo" sigo (según firebaseUid)
   const {
     data: followData,
     isFetching,
@@ -68,8 +63,8 @@ export default function Header() {
   const [follow,   { isLoading: following }]  = useFollowMutation();
   const [unfollow, { isLoading: unfollowing }] = useUnfollowMutation();
 
-  const me = !!followData?.me;          // ¿sigo a No Border?
-  const count = followData?.count ?? 0; // total seguidores
+  const me = !!followData?.me;          
+  const count = followData?.count ?? 0; 
 
   const safeTop = Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 20;
   const HEADER_HEIGHT = 64;
@@ -114,13 +109,13 @@ export default function Header() {
     }
     try {
       if (me) {
-        await unfollow({ uid }).unwrap();     // borra app/noborder/followers/<uid>
-        await bumpSupporters(-1);             // RTDB --
+        await unfollow({ uid }).unwrap();     
+        await bumpSupporters(-1);             
       } else {
-        await follow({ uid }).unwrap();       // crea/mergea app/noborder/followers/<uid>
-        await bumpSupporters(+1);             // RTDB ++
+        await follow({ uid }).unwrap();       
+        await bumpSupporters(+1);             
       }
-      await refetch(); // refresca contador + "me"
+      await refetch(); 
     } catch (e) {
       console.log('❌ followers toggle error:', e);
       await refetch();
@@ -182,7 +177,6 @@ export default function Header() {
               <Text style={styles.menuSub}>Salir de tu cuenta</Text>
             </TouchableOpacity>
 
-            {/* ─────────── Seguinos (No Border) ─────────── */}
             <View style={styles.itemDivider} />
 
             <View style={styles.followCard}>
@@ -262,7 +256,6 @@ const styles = StyleSheet.create({
   menuSub: { color: colors.TEXTO_SECUNDARIO, fontSize: 12, marginTop: 2 },
   dismissArea: { flex: 1 },
 
-  // ── Estilos del bloque "Seguinos"
   followCard: {
     backgroundColor: colors.FONDO,
     borderRadius: 12,

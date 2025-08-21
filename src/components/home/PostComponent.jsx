@@ -149,7 +149,6 @@ export default function PostComponent({ post, currentUser, onChanged }) {
 
   return (
     <View style={styles.card}>
-      {/* header */}
       <View style={styles.header}>
         <View style={styles.avatarWrap}>
           <Avatar emoji={authorAvatar} url={authorAvatarUrl} />
@@ -161,7 +160,6 @@ export default function PostComponent({ post, currentUser, onChanged }) {
         {isRepost && <View style={styles.repostTag}><Ionicons name="repeat" size={14} color={colors.TEXTO_SECUNDARIO} /><Text style={styles.repostText}>Repost</Text></View>}
       </View>
 
-      {/* body */}
       {!!shownText && <Text style={styles.body}>{shownText}</Text>}
       {needsClamp && !expanded && (
         <TouchableOpacity style={styles.moreBtn} onPress={() => setExpanded(true)}>
@@ -169,10 +167,8 @@ export default function PostComponent({ post, currentUser, onChanged }) {
         </TouchableOpacity>
       )}
 
-      {/* media */}
       <MediaGrid uris={mediaUris} />
 
-      {/* actions */}
       <View style={styles.actions}>
         <TouchableOpacity style={styles.actionBtn} onPress={onLike} activeOpacity={0.8}>
           <Ionicons

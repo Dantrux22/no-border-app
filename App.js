@@ -27,7 +27,6 @@ function Splash() {
 }
 
 function RootRouter() {
-  // 👇 Ya no condicionamos el registro de screens
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Auth">
       <Stack.Screen name="Auth" component={AuthScreen} />
@@ -44,10 +43,8 @@ function Bootstrap() {
     let done = false;
     (async () => {
       try {
-        // UID Firebase para Firestore/RTDB
         await ensureFirebaseAuthOnce();
 
-        // Bootstrap de sesión local (SQLite) -> setea Redux si hay usuario guardado
         const uid = await getCurrentUserId();
         if (uid) {
           const row = await getUserById(uid);

@@ -10,7 +10,6 @@ export default function GuardedHome(props) {
   const navigation = useNavigation();
   const [checking, setChecking] = useState(true);
 
-  // 👇 Resetea en el STACK raíz (padre del Drawer)
   const resetRoot = (routeName, params) =>
     navigation.getParent()?.dispatch(
       CommonActions.reset({ index: 0, routes: [{ name: routeName, params }] })
@@ -26,12 +25,12 @@ export default function GuardedHome(props) {
         try {
           const uid = await getCurrentUserId();
           if (!uid) {
-            if (alive) resetRoot('Auth');               // 👈 al login del Stack
+            if (alive) resetRoot('Auth');           
             return;
           }
           const completed = await isProfileCompleted(uid);
           if (!completed) {
-            if (alive) goToDrawer('ProfileSetup', { userId: uid }); // 👈 dentro del Drawer
+            if (alive) goToDrawer('ProfileSetup', { userId: uid });
             return;
           }
           if (alive) setChecking(false);
@@ -40,7 +39,7 @@ export default function GuardedHome(props) {
         }
       })();
       return () => { alive = false; };
-    }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    }, [])   
   );
 
   if (checking) {

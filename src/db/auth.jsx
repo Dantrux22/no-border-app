@@ -1,19 +1,16 @@
 // src/db/auth.jsx
 import { getDB } from './database';
 
-// Generador simple de IDs
 function id(prefix = 'u_') {
   return prefix + Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-// ---------- Utils de migración ----------
 async function columnExists(db, table, col) {
   const rows = await db.getAllAsync(`PRAGMA table_info(${table});`);
   return rows.some((r) => r.name === col);
 }
 
 async function ensureUsersBaseTable(db) {
-  // Crea la tabla si no existe (esquema mínimo y seguro)
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY NOT NULL,
@@ -25,20 +22,16 @@ async function ensureUsersBaseTable(db) {
 }
 
 async function migrateUsersAddMissingColumns(db) {
-  // avatar (emoji)
   if (!(await columnExists(db, 'users', 'avatar'))) {
     await db.runAsync(`ALTER TABLE users ADD COLUMN avatar TEXT;`);
   }
-  // avatar_url (foto)
   if (!(await columnExists(db, 'users', 'avatar_url'))) {
     await db.runAsync(`ALTER TABLE users ADD COLUMN avatar_url TEXT;`);
   }
-  // profile_completed (flag 0/1)
   if (!(await columnExists(db, 'users', 'profile_completed'))) {
     await db.runAsync(`ALTER TABLE users ADD COLUMN profile_completed INTEGER;`);
     await db.runAsync(`UPDATE users SET profile_completed = 0 WHERE profile_completed IS NULL;`);
   }
-  // created_at (timestamp) — agregar SIN default, luego rellenar
   if (!(await columnExists(db, 'users', 'created_at'))) {
     await db.runAsync(`ALTER TABLE users ADD COLUMN created_at TEXT;`);
     await db.runAsync(`UPDATE users SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL;`);
@@ -70,7 +63,6 @@ async function setSessionUser(userId) {
   );
 }
 
-// ---------- API pública ----------
 export async function getCurrentUserId() {
   await ensureTables();
   const db = await getDB();

@@ -11,7 +11,7 @@ export default function DrawerNavigator() {
   return (
     <Drawer.Navigator
       screenOptions={{ headerShown: false, drawerType: 'slide' }}
-      initialRouteName="Home"            // 👈 el Drawer arranca en Home
+      initialRouteName="Home"            
       backBehavior="history"
     >
       <Drawer.Screen name="Home" component={GuardedHome} options={{ title: 'Inicio' }} />

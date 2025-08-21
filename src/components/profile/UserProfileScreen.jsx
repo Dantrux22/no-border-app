@@ -9,7 +9,7 @@ import PostComponent from '../home/PostComponent';
 
 export default function UserProfileScreen() {
   const currentUser = useSelector((s) => s.user?.currentUser);
-  const [tab, setTab] = useState('posts'); // 'posts' | 'reposts' | 'saved'
+  const [tab, setTab] = useState('posts'); 
   const [items, setItems] = useState([]);
 
   const load = useCallback(async () => {

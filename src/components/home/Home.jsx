@@ -11,7 +11,6 @@ import PostComponent from './PostComponent';
 import { listFeedPosts, createPost } from '../../db/posts';
 import { colors } from '../global/colors';
 
-/* ───────────── Compositor único ───────────── */
 function PostComposer({ currentUser, onPosted }) {
   const [mountedOnce] = useState(() => {
     if (globalThis.__NB_COMPOSER__) return false;
@@ -113,7 +112,6 @@ function PostComposer({ currentUser, onPosted }) {
     </View>
   );
 }
-/* ──────────────────────────────────────────── */
 
 export default function Home() {
   const [feed, setFeed] = useState([]);

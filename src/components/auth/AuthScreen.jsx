@@ -13,7 +13,6 @@ import {
   getCurrentUserId,
 } from '../../db/auth';
 
-// 👇 usamos el ref global para resetear SIEMPRE en la raíz
 import { resetToNested, isReady, navigate } from '../../navigation/navigationRef';
 
 function friendly(e) {
@@ -28,7 +27,7 @@ function friendly(e) {
 
 export default function AuthScreen() {
   const dispatch = useDispatch();
-  const [mode, setMode] = useState('login'); // 'login' | 'signup'
+  const [mode, setMode] = useState('login');
 
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPass, setLoginPass] = useState('');
@@ -39,17 +38,14 @@ export default function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
 
-  /** ✅ Reset a Drawer: App -> (Home/ProfileSetup) usando el ref global */
   const resetTo = (drawerScreenName, params) => {
     if (isReady()) {
       resetToNested('App', drawerScreenName, params);
     } else {
-      // Fallback muy temprano: navegar sin reset (se corrige más tarde)
       navigate('App', { screen: drawerScreenName, params });
     }
   };
 
-  // Si ya hay sesión al montar, redirigir según estado de perfil
   useEffect(() => {
     (async () => {
       try {
@@ -62,10 +58,8 @@ export default function AuthScreen() {
           resetTo('Home');
         }
       } catch {
-        /* no-op */
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onSignup = async () => {
@@ -201,7 +195,6 @@ export default function AuthScreen() {
   );
 }
 
-/* Estilos */
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.FONDO, alignItems: 'center', justifyContent: 'center', padding: 16 },
   card: { width: '100%', maxWidth: 420, gap: 12 },
