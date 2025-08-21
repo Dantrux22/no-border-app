@@ -1,11 +1,9 @@
-// src/components/auth/AuthScreen.jsx
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useDispatch } from 'react-redux';
-import { useNavigation, CommonActions } from '@react-navigation/native';
 import { colors } from '../global/colors';
 import { setUser } from '../../redux/userSlice';
 import {
@@ -14,6 +12,9 @@ import {
   isProfileCompleted,
   getCurrentUserId,
 } from '../../db/auth';
+
+// 👇 usamos el ref global para resetear SIEMPRE en la raíz
+import { resetToNested, isReady, navigate } from '../../navigation/navigationRef';
 
 function friendly(e) {
   const code = e?.code || '';
@@ -27,7 +28,6 @@ function friendly(e) {
 
 export default function AuthScreen() {
   const dispatch = useDispatch();
-  const navigation = useNavigation();
   const [mode, setMode] = useState('login'); // 'login' | 'signup'
 
   const [loginEmail, setLoginEmail] = useState('');
@@ -39,25 +39,14 @@ export default function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
 
-  /**
-   * ✅ Resetear la raíz del Stack hacia el Drawer ("App")
-   *    y abrir una screen interna del Drawer (Home/ProfileSetup).
-   */
+  /** ✅ Reset a Drawer: App -> (Home/ProfileSetup) usando el ref global */
   const resetTo = (drawerScreenName, params) => {
-    navigation.dispatch(
-      CommonActions.reset({
-        index: 0,
-        routes: [
-          {
-            name: 'App', // <- Stack.Screen que monta el DrawerNavigator
-            state: {
-              index: 0,
-              routes: [{ name: drawerScreenName, params }],
-            },
-          },
-        ],
-      })
-    );
+    if (isReady()) {
+      resetToNested('App', drawerScreenName, params);
+    } else {
+      // Fallback muy temprano: navegar sin reset (se corrige más tarde)
+      navigate('App', { screen: drawerScreenName, params });
+    }
   };
 
   // Si ya hay sesión al montar, redirigir según estado de perfil
@@ -89,7 +78,6 @@ export default function AuthScreen() {
     try {
       const user = await registerUser({ email, password, username });
       dispatch(setUser(user));
-      // Onboarding: ir a configurar perfil
       resetTo('ProfileSetup', { userId: user.id });
     } catch (e) {
       console.log('❌ signup sqlite error:', e);

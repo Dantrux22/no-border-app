@@ -10,10 +10,14 @@ export default function GuardedHome(props) {
   const navigation = useNavigation();
   const [checking, setChecking] = useState(true);
 
-  const resetTo = (name, params) =>
-    navigation.dispatch(
-      CommonActions.reset({ index: 0, routes: [{ name, params }] })
+  // 👇 Resetea en el STACK raíz (padre del Drawer)
+  const resetRoot = (routeName, params) =>
+    navigation.getParent()?.dispatch(
+      CommonActions.reset({ index: 0, routes: [{ name: routeName, params }] })
     );
+
+  const goToDrawer = (screen, params) =>
+    resetRoot('App', { screen, params });
 
   useFocusEffect(
     useCallback(() => {
@@ -22,12 +26,12 @@ export default function GuardedHome(props) {
         try {
           const uid = await getCurrentUserId();
           if (!uid) {
-            if (alive) resetTo('Auth');
+            if (alive) resetRoot('Auth');               // 👈 al login del Stack
             return;
           }
           const completed = await isProfileCompleted(uid);
           if (!completed) {
-            if (alive) resetTo('ProfileSetup', { userId: uid });
+            if (alive) goToDrawer('ProfileSetup', { userId: uid }); // 👈 dentro del Drawer
             return;
           }
           if (alive) setChecking(false);

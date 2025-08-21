@@ -1,7 +1,5 @@
-// src/components/profile/ProfileSetupScreen.jsx
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, FlatList, Alert, Image } from 'react-native';
-import { useNavigation, useRoute, CommonActions } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { colors } from '../global/colors';
 import {
@@ -11,21 +9,24 @@ import {
   markProfileCompleted,
 } from '../../db/auth';
 
+// 👇 ref global para resetear a Home al terminar
+import { resetToNested, navigate, isReady } from '../../navigation/navigationRef';
+
 const EMOJIS = ['🦊','🐨','🐯','🐸','🐵','🐶','🐱','🦁','🐼','🦄','🧑','👩','👨','🧔','👩‍🦰','👨‍🦱','👩‍🦳','👨‍🦲','👩‍🎨','🕵️‍♂️'];
 
 export default function ProfileSetupScreen() {
-  const navigation = useNavigation();
-  const route = useRoute();
-
   const [tab, setTab] = useState('emoji');
   const [emoji, setEmoji] = useState(EMOJIS[0]);
   const [imageUri, setImageUri] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const resetTo = (name, params) =>
-    navigation.dispatch(
-      CommonActions.reset({ index: 0, routes: [{ name, params }] })
-    );
+  const resetToHome = () => {
+    if (isReady()) {
+      resetToNested('App', 'Home');
+    } else {
+      navigate('App', { screen: 'Home' });
+    }
+  };
 
   const pickFromGallery = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -38,9 +39,13 @@ export default function ProfileSetupScreen() {
   };
 
   const resolveUserId = async () => {
-    const paramId = route?.params?.userId;
-    if (paramId) return paramId;
-    return await getCurrentUserId();
+    // este screen puede recibir userId por params (no usamos useRoute aquí para mantenerlo simple)
+    try {
+      // preferimos el usuario local
+      const uid = await getCurrentUserId();
+      if (uid) return uid;
+    } catch {}
+    return null;
   };
 
   const handleSave = async () => {
@@ -60,9 +65,7 @@ export default function ProfileSetupScreen() {
         await updateUserAvatarUrl(uid, imageUri);
       }
       await markProfileCompleted(uid, 1);
-      // IMPORTANTE: resetear al Drawer 'Home' (no usar replace)
-      resetTo('Home');
-      // Alternativa simple (deja back a esta pantalla): navigation.navigate('Home');
+      resetToHome(); // ✅ volver a Home del Drawer
     } catch (e) {
       console.log('❌ profile save error:', e);
       Alert.alert('Error', 'No se pudo guardar el avatar.');

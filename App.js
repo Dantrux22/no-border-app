@@ -1,4 +1,3 @@
-// App.js
 import 'react-native-gesture-handler';
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, Text } from 'react-native';
@@ -14,7 +13,6 @@ import DrawerNavigator from './src/navigation/DrawerNavigator';
 import AuthScreen from './src/components/auth/AuthScreen';
 
 import { getCurrentUserId, getUserById } from './src/db/auth';
-// 👇 Garantiza UID Firebase (una sola vez al boot)
 import { ensureFirebaseAuthOnce } from './src/firebaseAuth';
 
 const Stack = createNativeStackNavigator();
@@ -29,14 +27,11 @@ function Splash() {
 }
 
 function RootRouter() {
-  const currentUser = useSelector((s) => s.user?.currentUser);
+  // 👇 Ya no condicionamos el registro de screens
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      {currentUser ? (
-        <Stack.Screen name="App" component={DrawerNavigator} />
-      ) : (
-        <Stack.Screen name="Auth" component={AuthScreen} />
-      )}
+    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Auth">
+      <Stack.Screen name="Auth" component={AuthScreen} />
+      <Stack.Screen name="App" component={DrawerNavigator} />
     </Stack.Navigator>
   );
 }
@@ -52,7 +47,7 @@ function Bootstrap() {
         // UID Firebase para Firestore/RTDB
         await ensureFirebaseAuthOnce();
 
-        // Bootstrap de sesión local (SQLite)
+        // Bootstrap de sesión local (SQLite) -> setea Redux si hay usuario guardado
         const uid = await getCurrentUserId();
         if (uid) {
           const row = await getUserById(uid);

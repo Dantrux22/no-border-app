@@ -4,54 +4,22 @@ import { createDrawerNavigator } from '@react-navigation/drawer';
 import GuardedHome from '../components/home/GuardedHome';
 import UserProfileScreen from '../components/profile/UserProfileScreen';
 import ProfileSetupScreen from '../components/profile/ProfileSetupScreen';
-import AuthScreen from '../components/auth/AuthScreen';
 
 const Drawer = createDrawerNavigator();
 
 export default function DrawerNavigator() {
   return (
     <Drawer.Navigator
-      screenOptions={{
-        headerShown: false,
-        drawerType: 'slide',
-      }}
-      initialRouteName="Auth"
+      screenOptions={{ headerShown: false, drawerType: 'slide' }}
+      initialRouteName="Home"            // 👈 el Drawer arranca en Home
       backBehavior="history"
     >
-      {/* Gate de auth (oculto) */}
-      <Drawer.Screen
-        name="Auth"
-        component={AuthScreen}
-        options={{
-          headerShown: false,
-          drawerItemStyle: { display: 'none' },
-          swipeEnabled: false, // 👈 importante: no abrir drawer en Auth
-        }}
-      />
-
-      {/* Home protegido */}
-      <Drawer.Screen
-        name="Home"
-        component={GuardedHome}
-        options={{ title: 'Inicio' }}
-      />
-
-      {/* Perfil visible */}
-      <Drawer.Screen
-        name="UserProfile"
-        component={UserProfileScreen}
-        options={{ title: 'Perfil' }}
-      />
-
-      {/* Configurar perfil (oculto) */}
+      <Drawer.Screen name="Home" component={GuardedHome} options={{ title: 'Inicio' }} />
+      <Drawer.Screen name="UserProfile" component={UserProfileScreen} options={{ title: 'Perfil' }} />
       <Drawer.Screen
         name="ProfileSetup"
         component={ProfileSetupScreen}
-        options={{
-          title: 'Configurar perfil',
-          drawerItemStyle: { display: 'none' },
-          headerShown: false,
-        }}
+        options={{ drawerItemStyle: { display: 'none' }, headerShown: false }}
       />
     </Drawer.Navigator>
   );
